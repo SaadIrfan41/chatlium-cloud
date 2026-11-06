@@ -1,6 +1,13 @@
 {
   "version": 1,
   "skills": {
+    "accessibility": {
+      "source": "addyosmani/web-quality-skills",
+      "sourceType": "github",
+      "skillPath": "skills/accessibility/SKILL.md",
+      "computedHash": "88c64dead9bb55925c7b983f5fd95cfecf30bd8c076fd384cdb17019d1becd87",
+      "installMode": "copy"
+    },
     "ai-sdk": {
       "source": "vercel/ai",
       "sourceType": "github",
@@ -49,6 +56,13 @@
       "skillPath": "skills/floci/SKILL.md",
       "computedHash": "1750157644b9eef69088285c8f9d85eb5079a917c2dad811bd9e6a73b5bb91b5"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384",
+      "installMode": "copy"
+    },
     "k6": {
       "source": "grafana/skills",
       "sourceType": "github",
@@ -72,6 +86,13 @@
       "sourceType": "github",
       "skillPath": "skills/grafana-core/promql/SKILL.md",
       "computedHash": "5a54dc2c9319e52d59d5b8694c51700a7795bc611584021c258d5d3c3274e5fd"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "7859e9a064940a1a0010c992b63e4633c4f5f39ed367a23c16f24029816b1703",
+      "installMode": "copy"
     },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
@@ -120,6 +141,13 @@
       "sourceType": "github",
       "skillPath": "skills/vitest/SKILL.md",
       "computedHash": "b26b7f8d10e860e944e0334c003207771707c4906514cb96c971faae13fba875"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "a6a44d5498f7e8f68289902f3dedfc6f38ae0cee1e96527c80724cf27f727c2a",
+      "installMode": "copy"
     }
   }
 }
