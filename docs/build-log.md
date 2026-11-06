@@ -102,3 +102,19 @@ Surprises (both caught by the tests on the first run):
 - oxlint's `no-unsafe-type-assertion` rejected `as` casts. Replaced them with typed functions and type guards.
 
 Mutation checks (each reverted): dropping the `key` pattern, not recursing into nested objects, removing child-binding redaction, and dropping the error message each make exactly one test fail.
+
+**1.4 Local infrastructure (2026-11-07).** `docker-compose.yml` (project `chatlium`) runs:
+
+- `postgres`: `pgvector/pgvector:0.8.7-pg18-trixie` (PostgreSQL 18.6, pgvector 0.8.7), pinned by tag and digest `sha256:5895949d…`
+- `redis`: `redis:8.10.3-alpine` with append-only persistence, pinned by digest `sha256:71885d8c…`
+
+Both have health checks, named volumes, and ports bound to `127.0.0.1` only. Credentials come from `.env` (gitignored). `.env.example` documents the variables, and Compose refuses to start if they are missing. The local `.env` was generated with a random password.
+
+Done-when evidence:
+
+- `docker compose up -d --wait`: exit 0, both containers `healthy`.
+- `psql` (the container's client over TCP; no psql on the host): `CREATE EXTENSION vector` succeeded, and `pg_extension` shows `vector 0.8.7`.
+- Beyond the guide: a temp table with `vector(3)`, an HNSW `vector_cosine_ops` index, and a cosine-distance query returned the expected order (0.0000, 0.0061, 1.0000). `redis-cli ping` returned `PONG`, version 8.10.3.
+- Persistence: after `docker compose down` and `up`, the extension is still present, so the volume path is correct.
+
+Surprise: **PostgreSQL 18 images moved their data directory** to `/var/lib/postgresql/18/docker` and declare `/var/lib/postgresql` as the volume. Mounting the old `/var/lib/postgresql/data` path would make data disappear silently on recreate. The volume is mounted at `/var/lib/postgresql`.
