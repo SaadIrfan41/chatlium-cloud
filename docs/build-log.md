@@ -118,3 +118,35 @@ Done-when evidence:
 - Persistence: after `docker compose down` and `up`, the extension is still present, so the volume path is correct.
 
 Surprise: **PostgreSQL 18 images moved their data directory** to `/var/lib/postgresql/18/docker` and declare `/var/lib/postgresql` as the volume. Mounting the old `/var/lib/postgresql/data` path would make data disappear silently on recreate. The volume is mounted at `/var/lib/postgresql`.
+
+**1.5 Database package and roles (2026-11-07).** `packages/db` with Drizzle ORM 0.45.4, drizzle-kit 0.31.11 and node-postgres 8.23.1. `bootstrapRoles()` creates `chatlium_owner` and `chatlium_app` and their privileges. It is run with `pnpm --filter @chatlium/db db:bootstrap` as the administrator, and `db:verify-roles` prints the role check. See [ADR 0002](adr/0002-database-roles-and-driver.md) for why roles are bootstrapped rather than created by a migration.
+
+Done-when evidence (local database):
+
+```
+SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'chatlium_app';
+ rolsuper | rolbypassrls
+----------+--------------
+ f        | f
+connected as chatlium_owner
+connected as chatlium_app
+```
+
+Running the bootstrap twice is harmless.
+
+Integration test (Testcontainers, a fresh PostgreSQL 18 + pgvector container, about 13 s): 8 tests pass. They cover the app and owner role flags, the app connects, pgvector is present, the app cannot run DDL, the app gets DML only on owner-created tables (no `TRUNCATE` or `DROP`), drifted flags are reset, and other roles cannot connect.
+
+Mutation checks (each reverted):
+
+- Drop `NOBYPASSRLS` → drift test fails
+- Drop `NOSUPERUSER` → drift test fails
+- Grant `ALL` instead of DML → DML-only test fails
+- Give the app `CREATE` on the schema → DDL test fails
+- Leave `CONNECT` for `PUBLIC` → outsider test fails. My first attempt at this mutation used invalid SQL, so setup crashed and all tests were _skipped_. A skipped run is not a caught mutation. It was redone with a valid no-op.
+
+Surprises:
+
+- **Postgres already creates roles as non-superuser and without BYPASSRLS by default**, so a test on a freshly created role cannot tell whether the code enforces those flags. The drift test, where the role is made superuser with BYPASSRLS first and the bootstrap must reset it, is what actually proves the code.
+- **pnpm 12 blocks dependency install scripts** (`ERR_PNPM_IGNORED_BUILDS`) for esbuild, ssh2, cpu-features and protobufjs. All four are denied in `allowBuilds`; drizzle-kit's esbuild and Testcontainers work without them.
+- oxlint required named imports from `pg` (`import { Pool } from 'pg'`).
+- Drizzle's `drizzle.config.ts` and migrations start in Step 1.6. No tables exist yet.
