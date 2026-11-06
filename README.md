@@ -5,7 +5,18 @@ The project is a cloud and DevOps portfolio build: it is developed locally again
 
 ## Status
 
-Phase 0 (preparation). Progress is recorded in [docs/build-log.md](docs/build-log.md).
+Phase 1 (foundation and tenant isolation). Progress is recorded in [docs/build-log.md](docs/build-log.md).
+
+## Local development
+
+Requires Node 26, pnpm 12 and Docker.
+
+```bash
+cp .env.example .env        # then set a password in .env
+pnpm install
+docker compose up -d --wait # PostgreSQL 18 + pgvector, Redis 8
+pnpm lint && pnpm typecheck && pnpm test
+```
 
 ## Documentation
 
