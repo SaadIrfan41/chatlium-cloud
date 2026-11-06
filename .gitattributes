@@ -1,0 +1,6 @@
+# Normalize line endings to LF in the repository (matches .editorconfig)
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.pdf binary

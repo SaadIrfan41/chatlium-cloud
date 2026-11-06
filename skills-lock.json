@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "skills": {
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "sourceType": "github",
+      "skillPath": "skills/use-ai-sdk/SKILL.md",
+      "computedHash": "12672e7c040c99b182ceb86517f36f6409e7e22e101178cf554767b0f5d9dd0a"
+    },
+    "aws-billing-and-cost-management": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-billing-and-cost-management/SKILL.md",
+      "computedHash": "6dcc33ee4a3ed2ffd0d7f54f427b70551772eac344afebcb868ed24f22700736"
+    },
+    "aws-containers": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-containers/SKILL.md",
+      "computedHash": "2eb1ff4e2c99e1e304cc1f91298f5eba964de315a8cd558424acc73b1012afdd"
+    },
+    "aws-iam": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-iam/SKILL.md",
+      "computedHash": "d065fbfed2b8f0411e7867353069392d4a0b8ad6f1225217c7b15a6ff051ac63"
+    },
+    "aws-observability": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-observability/SKILL.md",
+      "computedHash": "cc90b286f92bfef0f0f9d3ad283f2983280c053a5b7ae2f48537e38c3d53c3dd"
+    },
+    "dashboarding": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/dashboarding/SKILL.md",
+      "computedHash": "cafd091f7b71fb043ada1b9bbf17e529474b6116dbd3c9e31d70d787b1eb90e3"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
+    "floci": {
+      "source": "floci-io/floci-cli",
+      "sourceType": "github",
+      "skillPath": "skills/floci/SKILL.md",
+      "computedHash": "1750157644b9eef69088285c8f9d85eb5079a917c2dad811bd9e6a73b5bb91b5"
+    },
+    "k6": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-k6/k6/SKILL.md",
+      "computedHash": "5733ebf047ef4c03abe77f5c9614653106e5fa4965b427f70ff620c7253b3584"
+    },
+    "multi-stage-dockerfile": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
+      "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
+    },
+    "opentelemetry": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/opentelemetry/SKILL.md",
+      "computedHash": "772a52faf409e5ed3a353bde694aaa1df017d87d63f1fb6489c7c9c2ab3b22ee"
+    },
+    "promql": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/promql/SKILL.md",
+      "computedHash": "5a54dc2c9319e52d59d5b8694c51700a7795bc611584021c258d5d3c3274e5fd"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
+    "tempo": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-lgtm/tempo/SKILL.md",
+      "computedHash": "f50c5fe9e723c963b3e77e8594be9dd3135c392913b73a78788ee09cbe8d2cce"
+    },
+    "terraform-search-import": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-search-import/SKILL.md",
+      "computedHash": "19c1271cd4d3329bdff98a8f717bd2752fed9b51f34d376182c709730cf10482"
+    },
+    "terraform-style-guide": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-style-guide/SKILL.md",
+      "computedHash": "b47790ecc50d56cba8970b8d9814e96d624cdd64a22a38118d11a554836cd768"
+    },
+    "terraform-test": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/terraform/skills/terraform-test/SKILL.md",
+      "computedHash": "c9e257250e14ea71e522e131a4a63a65434360fe3a0635c8bf8a49ca5529e2cd"
+    },
+    "turborepo": {
+      "source": "vercel/turborepo",
+      "sourceType": "github",
+      "skillPath": "skills/turborepo/SKILL.md",
+      "computedHash": "9681d8dfeb5e6cdff767f1bcaba5d7ac55732a9d6c02ee120f44229f8ec25e7e"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vitest/SKILL.md",
+      "computedHash": "b26b7f8d10e860e944e0334c003207771707c4906514cb96c971faae13fba875"
+    }
+  }
+}

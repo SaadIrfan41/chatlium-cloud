@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output and caches
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+
+# Tests
+playwright-report/
+test-results/
+blob-report/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfstate.lock.info
+
+# Local data
+floci-data/
+*.log
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Agent skill copies for other tools (Claude Code reads .claude/skills)
+.agents/
