@@ -17,7 +17,7 @@
     },
     "test": {
       "dependsOn": ["transit"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     }
   }
 }

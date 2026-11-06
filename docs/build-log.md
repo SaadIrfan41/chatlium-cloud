@@ -67,3 +67,24 @@ Surprises:
 - **pnpm 12 has a supply-chain release-age delay.** Installing oxlint 1.92.0, published about 7 hours earlier, made pnpm write `minimumReleaseAgeExclude` entries for it into `pnpm-workspace.yaml`. Owner decision: pin **oxlint 1.91.0** (2026-11-03), which passes the delay, and keep no exceptions. Policy: we do not add release-age exceptions; Renovate (Step 1.13) proposes newer versions once they age.
 - Turborepo's `transit` task pattern lets `lint` and `typecheck` run in parallel while still re-running when an internal dependency changes.
 - Turborepo prints "No tasks were executed" on the empty workspace and exits 0. This is expected until packages with scripts exist.
+
+**1.2 Configuration package (2026-11-07).** `packages/config`: a Zod 4.6.7 schema covering every environment variable known so far (`NODE_ENV`, `LOG_LEVEL`, `APP_BASE_URL`, `DATABASE_URL`, `REDIS_URL`, `AWS_REGION`, `AWS_ENDPOINT_URL` for Floci only, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_ISSUER`, `SESSION_SEALING_KEY`, `GEMINI_API_KEY_SECRET_ID`). `loadConfig()` returns a frozen config, or throws a `ConfigError` that lists every problem by variable name and never includes a value. Empty strings count as missing. Tests use Vitest 5.1.0.
+
+Decisions made in this step:
+
+- `COGNITO_ISSUER` is explicit configuration rather than derived from the pool ID, because Floci issues `http://<floci-host>/<poolId>` and AWS issues `https://cognito-idp.<region>.amazonaws.com/<poolId>`.
+- The Gemini key is **not** an environment variable. Processes get the Secrets Manager secret ID (`GEMINI_API_KEY_SECRET_ID`) and fetch the key at runtime. The decision record says the key never touches the repo.
+- `packages/tsconfig` gained `rewriteRelativeImportExtensions` and `erasableSyntaxOnly`, so packages import `./file.ts` and Node 26 can run TypeScript directly.
+
+Done-when evidence:
+
+- Tests: 7 passed. The guide's three (complete env parses; a missing variable is named; a malformed value fails) plus: a missing URL variable says "is required"; all problems are listed at once; a secret value never appears in the error; defaults apply.
+- Broken environment at startup (Node 26, `mysql://u:hunter2-secret@db/x` and a short sealing key): exit code 1, with `Invalid configuration (8 problem(s))` listing each variable and its problem. Neither secret appears in the output.
+
+Proof that the tests fail for the right reasons (mutation checks, each reverted afterwards):
+
+- Error text echoes the value → 3 tests fail, including the secret-leak test.
+- `DATABASE_URL` accepts any string → the malformed-value test fails.
+- Missing variables reported with the raw schema message → **initially no test failed.** This exposed a gap: only a plain-string variable had been tested as missing. Added a test for a missing URL variable, which now fails under this mutation.
+
+Surprise: the mutation check found a real test gap on the first run. Keep doing it for every step.
