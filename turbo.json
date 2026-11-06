@@ -18,6 +18,11 @@
     "test": {
       "dependsOn": ["transit"],
       "outputs": []
+    },
+    "test:integration": {
+      "dependsOn": ["transit"],
+      "outputs": [],
+      "cache": false
     }
   }
 }
