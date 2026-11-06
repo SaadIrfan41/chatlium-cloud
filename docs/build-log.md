@@ -88,3 +88,17 @@ Proof that the tests fail for the right reasons (mutation checks, each reverted 
 - Missing variables reported with the raw schema message → **initially no test failed.** This exposed a gap: only a plain-string variable had been tested as missing. Added a test for a missing URL variable, which now fails under this mutation.
 
 Surprise: the mutation check found a real test gap on the first run. Keep doing it for every step.
+
+**1.3 Structured logger (2026-11-07).** `packages/observability` with Pino 10.4.0. `createLogger({ service, level, destination })` writes JSON lines with `time` (ISO 8601), `level` (as a label), `service` and `msg`. `withContext(logger, { workspaceId, requestId })` returns a child logger that adds `workspace_id` and `request_id`. Redaction replaces the value of any field whose name contains `authorization`, `cookie`, `password`, `passwd`, `secret`, `token` or `key` (case-insensitive, at any depth, inside arrays and errors). Circular references and very deep objects are handled.
+
+Decision: redaction is key-based rather than path-based. Pino's `redact` option only takes exact paths such as `req.headers.cookie`, so it cannot express the guide's "any field whose name matches `*key*`" at any depth. A sanitizer runs in Pino's `log` and `bindings` formatters and as the `err` serializer.
+
+Done-when evidence: 8 tests pass. The redaction test logs a fake secret in 8 different sensitive fields (top-level, nested headers, 4 levels deep, inside an array) and asserts the raw output does not contain it. Other tests cover: line format, non-sensitive fields kept, errors keep message and stack and have secrets redacted, circular references, child context fields, and child bindings redacted.
+
+Surprises (both caught by the tests on the first run):
+
+- **Pino's `formatters.bindings` does not apply to `logger.child(bindings)`.** A `sessionToken` passed as a child binding was printed in plain text. Fix: `child` is wrapped so child bindings are redacted at every level.
+- **Copying an `Error` as a plain object loses `message` and `stack`**, which are not enumerable, and Pino's own `err` serializer hid them from the sanitizer. Fix: the sanitizer copies them explicitly and replaces the `err` serializer.
+- oxlint's `no-unsafe-type-assertion` rejected `as` casts. Replaced them with typed functions and type guards.
+
+Mutation checks (each reverted): dropping the `key` pattern, not recursing into nested objects, removing child-binding redaction, and dropping the error message each make exactly one test fail.
