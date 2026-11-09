@@ -429,6 +429,8 @@ Tests: a text file, a markdown file, a PDF with a real text layer, a PDF with no
 
 ### Step 2.4: Chunking
 
+> **Amended:** markdown chunks follow headings and record a heading path. See amendments §12.5.
+
 Create a deterministic recursive character splitter in `packages/knowledge/chunking`:
 - Target size around 800 characters, overlap around 100. Choose the values, record them as constants, and do not change them without a test update.
 - Split on paragraph breaks first, then sentences, then characters.
@@ -439,6 +441,8 @@ Tests: empty input produces no chunks; a short input produces one chunk; a long 
 **Done when:** the tests pass.
 
 ### Step 2.5: Embeddings and the indexing worker
+
+> **Amended:** identical content in the same workspace reuses existing vectors. See amendments §12.5.
 
 Create `packages/ai` with:
 - `LLMProvider` interface (`generate`, `stream`, `embed`).
@@ -459,6 +463,8 @@ Add the `document_chunks` table with a `vector(768)` column and an HNSW index fo
 **Watch out:** Do not put document text into logs or traces. Log counts and IDs only.
 
 ### Step 2.6: Vector search with tenant scope
+
+> **Amended:** this step becomes hybrid search (pgvector plus Postgres full-text, merged with RRF), followed by the golden set and retrieval metrics. See amendments §12.1 and §12.4.
 
 Create `packages/knowledge/retrieval`:
 - `search(workspaceId, queryText, { topK, minScore })`: embeds the query (writes an `embedding_calls` row with `purpose = query`), then runs a cosine similarity query inside `withWorkspace`, filtered to `ready` documents.
@@ -518,6 +524,8 @@ Tests: each of the five checks refuses correctly, and a valid request creates ex
 
 ### Step 2.9: Workflow executor v0 (fixed default graph)
 
+> **Amended:** the Knowledge node outputs `{ chunks, topVectorScore, lexicalHit }`, and the LLM node cites chunks by label. See amendments §12.1 and §12.3.
+
 Create `packages/workflow` with:
 - A fixed default graph in code: `Knowledge → LLM → Condition → Action`.
 - An executor that runs nodes in order, passes typed outputs between them, and records each step in `execution_steps`.
@@ -534,6 +542,8 @@ Create the `execution_steps` and `workflow_versions` tables as part of this step
 **Done when:** a fixed input produces a recorded execution with four steps and the expected decision.
 
 ### Step 2.10: Chat worker and streamed answers
+
+> **Amended:** follow-up messages are rewritten into a standalone query for retrieval, and citations are checked and stored on completion. See amendments §12.2 and §12.3.
 
 Create `apps/chat-worker` (in-process queue for now). For each chat job:
 1. Claim the job in `processed_messages` (or, if already claimed by another attempt, stop). Phase 3 formalizes the claim lease. Record the simple version now.
@@ -565,6 +575,8 @@ Tests:
 **Done when:** the three tests pass, and a manual subscription from the browser receives the streamed tokens for its own conversation only.
 
 ### Step 2.12: Condition and escalation
+
+> **Amended:** the escalation rule and threshold are chosen with the golden-set harness. See amendments §12.4.
 
 Escalation rules for the slice:
 - Escalate if the top similarity score is below a threshold, or the visitor asks for a person.
@@ -646,6 +658,7 @@ Record a short screen capture of this run. Save it under `docs/evidence/`.
 
 ### Phase 2 exit checklist
 - [ ] Upload, extraction, chunking, embedding, and retrieval work and are tested
+- [ ] The golden-set retrieval metrics run in CI against a committed baseline (amendments §12.4)
 - [ ] Retrieval is tenant-scoped in the query, and cross-tenant retrieval is tested
 - [ ] Widget tokens and origin checks are tested
 - [ ] Message intake has five tested checks and creates one message and one job
