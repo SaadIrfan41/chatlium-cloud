@@ -378,3 +378,39 @@ Done-when evidence, from probe PR #14 (closed, never merged):
 - `config:recommended` ignores `**/test/**`, so the Testcontainers image pin was never seen. `ignorePaths` now excludes only `node_modules`, and the regex manager detects `pgvector/pgvector` in `postgres.ts`.
 - `rangeStrategy: pin` would have pinned the `engines` ranges for Node and pnpm. A rule keeps them as ranges (`replace`).
 - `packages/config` had `"@types/node": "^26.6.6"`, the only non-exact version in the repo. It is now `26.6.6`.
+
+## Phase 2: Vertical slice
+
+**2.1 Queue interface and local adapter (2026-11-09).** New package `packages/queue`.
+
+- `MessageQueue<T>`: `publish(body, { groupId?, deduplicationId?, attributes? })`, `consume(handler, { concurrency })` returning a `Consumer` with `stop()`, plus `ack` and `nack`. A handler that resolves acks; one that throws nacks. The semantics are SQS's, so the Phase 3 SQS adapter can be a drop-in:
+  - At-least-once delivery.
+  - FIFO groups are delivered one at a time in publish order, and different groups run concurrently.
+  - FIFO deduplication uses a 5-minute window.
+  - Visibility timeout and redelivery.
+  - Dead-lettering after `maxReceiveCount` deliveries.
+  - Every delivery gets its own `receipt`, so a late ack from a timed-out delivery cannot delete the redelivered copy.
+  - `attributes` carries string metadata such as `traceparent`, for tracing across the queue later.
+- Bodies are validated with a Zod schema on publish and travel as JSON, as on a real queue. FIFO sends need a group and a deduplication ID, and standard queues reject deduplication IDs, as SQS does.
+- `createInProcessQueue({ kind, schema, maxReceiveCount, visibilityTimeoutMs })` is the in-process adapter. It is for unit tests in every phase, and the development queue only in Phase 2 (decisions: SQS on Floci from Phase 3). It also offers `deadLetters()` and `whenIdle()`.
+- The contract tests from amendments §3 are one reusable suite, `@chatlium/queue/contract` → `describeQueueContract(name, factory, timing)`. The in-process adapter runs it now, and the SQS adapter will run the same suite against Floci (and real SQS before the production demo). It covers: delivery exactly once (standard and FIFO), redelivery up to the limit then the DLQ, a transient failure recovering, FIFO order within a group, two consumers on different groups at once (never the same group twice), deduplication, visibility-timeout redelivery, and crash recovery with an idempotency check giving one side effect.
+
+Done-when evidence: 15 tests pass, 10 out of 10 repeated runs (several are timing-based). The guide's two required tests are "publish then consume delivers once" and "a handler that throws is redelivered up to the limit".
+
+Mutation checks: 13 deliberate bugs in the adapter, each reverted:
+
+- no FIFO group blocking
+- dead-lettering one receive late, or never
+- deduplication ignored, or its window never expiring
+- no visibility timeout
+- a stale receipt accepted
+- a throwing handler acked
+- FIFO sends without a group ID allowed
+- the schema not checked
+- attributes dropped
+- concurrency ignored
+- a stopping consumer still receiving
+
+The first run missed the last one. The obvious test, publishing after `stop()` resolved, passes even with the bug, because a stopped consumer is already removed from the list. The bug only matters _during_ `stop()`, while handlers are still in flight. The contract now includes a test that publishes in that window, and it catches the bug.
+
+Surprise: with dead-lettering removed, a handler that always throws is redelivered in a tight microtask loop. That starves the event loop, so even Vitest's own timeout never fires. The first mutation runner hung for hours, because on Windows `subprocess.run(..., timeout=)` with `shell=True` kills only the shell, not Node. The runner now kills the whole tree (`taskkill /T /F`) and counts a hang as caught. In the real adapter, dead-lettering ends that loop after `maxReceiveCount` deliveries. `retryDelayMs` can also space retries out.

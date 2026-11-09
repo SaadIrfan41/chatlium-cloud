@@ -1,0 +1,24 @@
+{
+  "name": "@chatlium/queue",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MessageQueue interface, in-process adapter and the shared queue contract tests",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./test/contract.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@chatlium/tsconfig": "workspace:*",
+    "@types/node": "26.6.6",
+    "vitest": "5.1.0"
+  }
+}
