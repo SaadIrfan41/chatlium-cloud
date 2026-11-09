@@ -111,7 +111,7 @@ describe('migrations', () => {
 
     await runMigrations(ownerUrl);
 
-    expect(before).toBe('2');
+    expect(before).toBe('3');
     expect(await appliedMigrationCount()).toBe(before);
   });
 

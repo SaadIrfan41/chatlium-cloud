@@ -192,3 +192,38 @@ Mutation checks (each reverted):
 - `withUser` sets the wrong setting → 1 test fails
 
 Not caught by behavior: rewriting `set_config` as `SET LOCAL` with string interpolation passes, because UUID validation already blocks injection. The code-level rule (bind parameters only) is enforced by review and stated in the function's doc comment.
+
+**1.8 Isolation tests (2026-11-09).** `packages/db/test/integration/isolation.test.ts` contains the guide's seven tests. Data is seeded through `chatlium_owner` (subject to RLS because of FORCE), and every assertion runs as `chatlium_app`:
+
+1. A's user cannot read B's documents (as a member and as a worker)
+2. A's user cannot read B's conversations
+3. Inserting a document with B's ID in A's context fails with `new row violates row-level security policy`, and nothing is written
+4. With no context, zero rows from documents, conversations and memberships
+5. `withUser(A)` returns only A's own membership rows
+6. A member of A only, acting through `withWorkspace(B)`, reads zero documents, conversations and memberships of B, and cannot insert into B
+7. The app role is not a superuser and does not bypass RLS
+
+Design change (owner decision, [ADR 0003](adr/0003-membership-aware-rls.md)): test 6 could not pass with the Step 1.6 policies, which compared only the workspace. `withWorkspace` now takes `{ workspaceId, userId? }`, and migration `0002_membership_aware_rls.sql` makes the tenant policies require membership whenever a user is set. Workers, with no user, keep the workspace-only rule. `memberships` cannot reference itself in a policy (infinite recursion), so its workspace-wide view is limited to system contexts.
+
+Done-when evidence: the 7 tests pass locally (31 integration tests in the package). They will also pass in CI once Step 1.13 adds it.
+
+**Failing for the right reason** (guide requirement), via `pnpm --filter @chatlium/db test:isolation-proof`. It re-runs the suite on a fresh database with one policy weakened at a time:
+
+```
+CAUGHT  test 1. documents tenant policy allows every row  (also failing: 3. 4. 6.)
+CAUGHT  test 2. conversations tenant policy allows every row  (also failing: 4. 6.)
+CAUGHT  test 3. documents WITH CHECK allows any workspace  (also failing: 6.)
+CAUGHT  test 4. row-level security disabled on documents  (also failing: 1. 3. 6.)
+CAUGHT  test 5. own_memberships allows every row  (also failing: 4. 6.)
+CAUGHT  test 6. documents policy checks the workspace only, not membership
+CAUGHT  test 7. tests connect as the superuser instead of chatlium_app  (also failing: 1. 2. 3. 4. 5. 6.)
+```
+
+Test 6 is the only test that catches a workspace-only policy. Connecting as the superuser fails all seven, which is the guard Step 1.5 asked for.
+
+Surprises:
+
+- **The guide's own policies could not satisfy its test 6.** Resolved by ADR 0003.
+- **A bare `toThrow()` would accept any error**, for example a typo, as "isolation works". Both rejection tests now assert the exact PostgreSQL message, which Drizzle wraps as `cause`.
+- The isolation proof takes about 70 s (7 fresh containers). It is a script rather than part of the normal integration run.
+- `EXPLAIN` confirms the membership check runs once per query: `InitPlan 1` uses an **Index Only Scan** on `memberships_workspace_user_key`, and documents are found through `documents_workspace_id_idx`.
