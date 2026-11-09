@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "timezone": "UTC",
+  "schedule": ["* 0-5 * * 1"],
+  "labels": ["dependencies"],
+  "rangeStrategy": "pin",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "postUpdateOptions": ["pnpmDedupe"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* 0-5 * * 1"]
+  },
+  "packageRules": [
+    {
+      "description": "One weekly PR for all non-major npm updates.",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "non-major dependencies",
+      "groupSlug": "npm-non-major"
+    },
+    {
+      "description": "One weekly PR for GitHub Actions (versions and pinned digests).",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "One weekly PR for container images and their digests.",
+      "matchManagers": ["docker-compose", "dockerfile", "custom.regex"],
+      "groupName": "container images"
+    },
+    {
+      "description": "oxlint and its type-aware engine are released together.",
+      "matchPackageNames": ["oxlint", "oxlint-tsgolint"],
+      "groupName": "oxlint"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "The Testcontainers Postgres image, kept on the same digest as docker-compose.yml.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^packages/db/test/integration/postgres\\.ts$/"],
+      "matchStrings": [
+        "'(?<depName>pgvector/pgvector):(?<currentValue>[^@']+)@(?<currentDigest>sha256:[a-f0-9]+)'"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
