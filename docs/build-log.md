@@ -227,3 +227,26 @@ Surprises:
 - **A bare `toThrow()` would accept any error**, for example a typo, as "isolation works". Both rejection tests now assert the exact PostgreSQL message, which Drizzle wraps as `cause`.
 - The isolation proof takes about 70 s (7 fresh containers). It is a script rather than part of the normal integration run.
 - `EXPLAIN` confirms the membership check runs once per query: `InitPlan 1` uses an **Index Only Scan** on `memberships_workspace_user_key`, and documents are found through `documents_workspace_id_idx`.
+
+**1.9 Cognito user pool, development (2026-11-09).** Owner decision (2026-11-06): development Cognito runs in **Floci**. Checked against Floci 2.4.0's documentation: managed login supports the authorization code flow with PKCE S256, `nonce`, discovery and JWKS, refresh and revocation. So no AWS account is needed yet.
+
+- `docker-compose.yml` gains `floci` (`floci/floci:2.4.0`, pinned by digest): persistent storage, localhost-only port 4566, no Docker socket, and a bash `/dev/tcp` health check because the image has no curl.
+- `packages/dev-tools`: `cognito:setup` creates or updates the user pool `chatlium-dev` (email sign-in, 12+ character password policy, optional TOTP MFA, admin-created users only), the app client `chatlium-web`, and two test users. It is idempotent, refuses to run against a non-local endpoint, and writes the IDs, the client secret and random test passwords to `.env` without printing them. `cognito:check` walks the hosted sign-in flow as a browser would.
+- Client secret decision: confidential client **plus** PKCE, see [ADR 0004](adr/0004-cognito-app-client-secret.md).
+
+Done-when evidence (`cognito:check`):
+
+```
+1. authorize        -> HTTP 302 redirect to /cognito-idp/login
+2. sign-in form     -> HTTP 200, CSRF token present
+3. submit password  -> HTTP 302 redirect to http://localhost:3000/api/auth/callback?code=<43 chars>&state=<matches>
+4. redeem code      -> HTTP 200; ID token iss ok, aud ok, token_use ok, nonce ok, exp ok
+OK: hosted sign-in redirects to the callback with an authorization code.
+```
+
+Negative checks: a callback URL differing only in its port (3001) gets HTTP 400 `redirect_uri is not registered for this client`, which is the guide's exact-match watch-out. A wrong password gets no redirect and no code. After `docker compose restart floci` the pool, issuer and sign-in still work, so persistent storage works.
+
+Surprises:
+
+- Floci's issuer is `http://localhost:4566/<poolId>` (AWS: `https://cognito-idp.<region>.amazonaws.com/<poolId>`), which is why `COGNITO_ISSUER` is explicit configuration (Step 1.2). It stays consistent in Phase 1 only because the browser and the dev server both use `localhost`. Phase 3 (web app in a container) must handle the browser seeing `localhost` while the server sees `floci`.
+- The AWS SDK resolved to `3.1164.0`, published 2.6 days earlier, so it passes pnpm's release-age delay with no exception.
