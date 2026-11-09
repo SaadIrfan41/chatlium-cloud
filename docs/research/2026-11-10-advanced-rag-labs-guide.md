@@ -1,6 +1,6 @@
 # Advanced RAG labs: a guide to the nine projects in `Advance rag/`
 
-> The `Advance rag/` folder is third-party course code kept only on the owner's machine. It is gitignored and not part of this repository, so the file links below work locally only.
+> The `Advance rag/` folder was third-party course code, read on the owner's machine and deleted after this guide was written. It was never part of this repository (the path stays gitignored), so the file paths below no longer resolve. No code from it was copied.
 
 This guide explains what each project in `Advance rag/` does, and how together they build an advanced RAG (retrieval-augmented generation) application. I read every project's README and demo runbook, and the source code each lab adds.
 

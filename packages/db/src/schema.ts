@@ -5,6 +5,7 @@
  * hand-written migration (drizzle/0001_rls.sql) because Drizzle cannot express
  * FORCE ROW LEVEL SECURITY.
  */
+import { DOCUMENT_FAILURE_REASONS, type DocumentFailureReason } from '@chatlium/contracts';
 import { sql } from 'drizzle-orm';
 import {
   check,
@@ -79,11 +80,20 @@ export const documents = pgTable(
     /** Set when indexing finishes. Vectors from different models are not comparable. */
     embeddingModel: text('embedding_model'),
     embeddingDims: integer('embedding_dims'),
+    /** Why indexing failed: one of DOCUMENT_FAILURE_REASONS, set only with status `failed`. */
+    failureReason: text('failure_reason').$type<DocumentFailureReason>(),
     createdAt: createdAt(),
   },
   (table) => [
     index('documents_workspace_id_idx').on(table.workspaceId),
     check('documents_size_bytes_positive', sql`${table.sizeBytes} > 0`),
+    // The list is copied into the constraint, so adding a failure reason needs a migration.
+    check(
+      'documents_failure_reason_valid',
+      sql`${table.failureReason} IS NULL OR (${table.status} = 'failed' AND ${table.failureReason} IN (${sql.raw(
+        DOCUMENT_FAILURE_REASONS.map((reason) => `'${reason}'`).join(', '),
+      )}))`,
+    ),
     uniqueIndex('documents_s3_key_key').on(table.s3Key),
   ],
 );

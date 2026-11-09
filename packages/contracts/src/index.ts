@@ -1,6 +1,7 @@
 export {
   ALLOWED_DOCUMENT_TYPES,
   createDocumentRequestSchema,
+  DOCUMENT_FAILURE_REASONS,
   documentObjectKey,
   indexingJobFor,
   indexingJobSchema,
@@ -9,5 +10,6 @@ export {
   UPLOAD_URL_TTL_SECONDS,
   type CreateDocumentRequest,
   type DocumentContentType,
+  type DocumentFailureReason,
   type IndexingJob,
 } from './documents.ts';

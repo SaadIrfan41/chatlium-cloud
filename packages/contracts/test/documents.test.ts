@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALLOWED_DOCUMENT_TYPES,
   createDocumentRequestSchema,
+  DOCUMENT_FAILURE_REASONS,
   documentObjectKey,
   indexingJobFor,
   indexingJobSchema,
@@ -98,5 +99,21 @@ describe('indexing job', () => {
         documentId: '0195d6a4-0000-7000-8000-0000000d0c01',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('document failure reasons', () => {
+  it('are distinct snake_case codes, safe to store and show', () => {
+    expect(new Set(DOCUMENT_FAILURE_REASONS).size).toBe(DOCUMENT_FAILURE_REASONS.length);
+    for (const reason of DOCUMENT_FAILURE_REASONS) {
+      expect(reason).toMatch(/^[a-z]+(?:_[a-z0-9]+)*$/);
+    }
+  });
+
+  it('include the codes the build guide requires', () => {
+    // A PDF without a text layer, and bytes that do not match the declared type (Step 2.3).
+    expect(DOCUMENT_FAILURE_REASONS).toEqual(
+      expect.arrayContaining(['no_text_layer', 'type_mismatch']),
+    );
   });
 });

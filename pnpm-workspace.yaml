@@ -11,3 +11,9 @@ allowBuilds:
   cpu-features: false
   # Version-check script only.
   protobufjs: false
+
+# Optional dependencies that are never installed.
+ignoredOptionalDependencies:
+  # pdf.js uses a native canvas only to render pages to images. Text extraction (build guide 2.3)
+  # never renders, so the native binary stays out.
+  - '@napi-rs/canvas'

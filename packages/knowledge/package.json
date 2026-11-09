@@ -1,0 +1,27 @@
+{
+  "name": "@chatlium/knowledge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Document knowledge: text extraction (later chunking, embeddings and retrieval)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@chatlium/contracts": "workspace:*",
+    "@chatlium/db": "workspace:*",
+    "@chatlium/storage": "workspace:*",
+    "pdfjs-dist": "6.5.438"
+  },
+  "devDependencies": {
+    "@chatlium/tsconfig": "workspace:*",
+    "@types/node": "26.6.6",
+    "vitest": "5.1.0"
+  }
+}

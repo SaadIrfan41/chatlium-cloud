@@ -1,8 +1,12 @@
-import { documentObjectKey, type DocumentContentType } from '@chatlium/contracts';
+import {
+  documentObjectKey,
+  type DocumentContentType,
+  type DocumentFailureReason,
+} from '@chatlium/contracts';
 import { and, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { documents } from './schema.ts';
-import { withWorkspace } from './tenant.ts';
+import { withWorkspace, type WorkspaceContext } from './tenant.ts';
 
 /** Web requests always act for a user inside a workspace (ADR 0003). */
 export interface UserInWorkspace {
@@ -20,6 +24,7 @@ export interface DocumentRecord {
   readonly s3Key: string;
   readonly contentType: string;
   readonly sizeBytes: number;
+  readonly failureReason: DocumentFailureReason | null;
 }
 
 const columns = {
@@ -30,7 +35,18 @@ const columns = {
   s3Key: documents.s3Key,
   contentType: documents.contentType,
   sizeBytes: documents.sizeBytes,
+  failureReason: documents.failureReason,
 };
+
+/** A job carries a workspace validated at ingestion, but no user (ADR 0003, amendments §4). */
+export interface JobWorkspace {
+  readonly workspaceId: string;
+}
+
+/** Workers act for the workspace only, never as a user. */
+function jobContext(job: JobWorkspace): WorkspaceContext {
+  return { workspaceId: job.workspaceId };
+}
 
 /**
  * Inserts a document in status `pending` and returns it. The S3 key is derived from the
@@ -107,6 +123,39 @@ export async function markDocumentUploaded(
           eq(documents.status, 'pending'),
         ),
       )
+      .returning({ id: documents.id }),
+  );
+  return rows.length === 1;
+}
+
+/** The indexing worker's view of one document, or undefined if the workspace has no such one. */
+export async function findDocumentForJob(
+  db: NodePgDatabase,
+  job: JobWorkspace,
+  documentId: string,
+): Promise<DocumentRecord | undefined> {
+  const rows = await withWorkspace(db, jobContext(job), (tx) =>
+    tx.select(columns).from(documents).where(eq(documents.id, documentId)).limit(1),
+  );
+  return rows[0];
+}
+
+/**
+ * Moves an uploaded document to `failed` and records why. Returns false if it was not in status
+ * `uploaded` (already indexed, already failed, or not this workspace's), so a redelivered job
+ * cannot overwrite an earlier outcome.
+ */
+export async function markDocumentFailed(
+  db: NodePgDatabase,
+  job: JobWorkspace,
+  documentId: string,
+  reason: DocumentFailureReason,
+): Promise<boolean> {
+  const rows = await withWorkspace(db, jobContext(job), (tx) =>
+    tx
+      .update(documents)
+      .set({ status: 'failed', failureReason: reason })
+      .where(and(eq(documents.id, documentId), eq(documents.status, 'uploaded')))
       .returning({ id: documents.id }),
   );
   return rows.length === 1;
