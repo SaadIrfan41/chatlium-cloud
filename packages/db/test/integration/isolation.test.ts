@@ -73,10 +73,11 @@ async function seedTenant(
     "INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'operator')",
     [workspaceId, userId],
   );
-  await owner.query("INSERT INTO documents (workspace_id, title, s3_key) VALUES ($1, $2, 'k')", [
-    workspaceId,
-    title,
-  ]);
+  await owner.query(
+    `INSERT INTO documents (workspace_id, title, s3_key, content_type, size_bytes)
+     VALUES ($1, $2, 'k/' || gen_random_uuid(), 'text/plain', 1)`,
+    [workspaceId, title],
+  );
   await owner.query('INSERT INTO conversations (workspace_id) VALUES ($1)', [workspaceId]);
   await owner.query('COMMIT');
 }
@@ -155,9 +156,13 @@ describe('tenant isolation', () => {
 
   it("3. inserting a document with workspace B's ID in workspace A's context is refused", async () => {
     const insert = withWorkspace(app.db, { workspaceId: ids.workspaceA, userId: ids.userA }, (tx) =>
-      tx
-        .insert(schema.documents)
-        .values({ workspaceId: ids.workspaceB, title: 'smuggled', s3Key: 'k' }),
+      tx.insert(schema.documents).values({
+        workspaceId: ids.workspaceB,
+        title: 'smuggled',
+        s3Key: 'k-smuggled',
+        contentType: 'text/plain',
+        sizeBytes: 1,
+      }),
     );
 
     expect(await rejectionText(insert)).toMatch(RLS_VIOLATION);
@@ -206,9 +211,13 @@ describe('tenant isolation', () => {
       app.db,
       { workspaceId: ids.workspaceB, userId: ids.userA },
       (tx) =>
-        tx
-          .insert(schema.documents)
-          .values({ workspaceId: ids.workspaceB, title: 'intruder', s3Key: 'k' }),
+        tx.insert(schema.documents).values({
+          workspaceId: ids.workspaceB,
+          title: 'intruder',
+          s3Key: 'k-intruder',
+          contentType: 'text/plain',
+          sizeBytes: 1,
+        }),
     );
     expect(await rejectionText(intrude)).toMatch(RLS_VIOLATION);
   });

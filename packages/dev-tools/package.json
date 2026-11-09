@@ -11,9 +11,12 @@
     "cognito:check": "node --env-file=../../.env src/cognito-signin-check.ts",
     "web:auth-check": "node --env-file=../../.env src/web-auth-check.ts",
     "db:seed-dev": "node --env-file=../../.env src/db-seed-dev.ts",
-    "web:workspace-check": "node --env-file=../../.env src/web-workspace-check.ts"
+    "web:workspace-check": "node --env-file=../../.env src/web-workspace-check.ts",
+    "s3:setup": "node --env-file=../../.env src/s3-setup.ts",
+    "web:upload-check": "node --env-file=../../.env src/web-upload-check.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1164.0",
     "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
     "@chatlium/auth": "workspace:*",
     "@chatlium/crypto": "workspace:*",

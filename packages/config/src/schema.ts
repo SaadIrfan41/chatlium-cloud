@@ -39,6 +39,10 @@ export const envSchema = z.object({
     .regex(/^[a-z]{2}(-[a-z]+)+-\d$/, { error: 'must be an AWS region such as us-east-1' }),
   /** Set only for local emulation (Floci). Unset in AWS. */
   AWS_ENDPOINT_URL: url(['http', 'https']).optional(),
+  /** S3 bucket for uploaded document originals. */
+  DOCUMENTS_BUCKET: z
+    .string({ error: 'is required' })
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, { error: 'must be a valid S3 bucket name' }),
 
   COGNITO_USER_POOL_ID: z
     .string({ error: 'is required' })
