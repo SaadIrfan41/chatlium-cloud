@@ -36,5 +36,27 @@
     "**/coverage/**",
     "**/node_modules/**",
     ".claude/**"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/*/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@chatlium/db/admin",
+                "message": "Apps must not bundle role bootstrap or migrations (ADR 0002)."
+              },
+              {
+                "name": "@chatlium/db/testing",
+                "message": "Test fixtures are for tests only."
+              }
+            ]
+          }
+        ]
+      }
+    }
   ]
 }

@@ -61,3 +61,29 @@ export async function seedDocument(
     [workspaceId, title],
   );
 }
+
+/** Inserts a user as the superuser and returns its ID. */
+export async function seedUser(admin: Client, cognitoSub: string, email: string): Promise<string> {
+  const result = await admin.query<{ id: string }>(
+    'INSERT INTO users (cognito_sub, email) VALUES ($1, $2) RETURNING id',
+    [cognitoSub, email],
+  );
+  const id = result.rows[0]?.id;
+  if (id === undefined) {
+    throw new Error('user insert returned no id');
+  }
+  return id;
+}
+
+export async function seedMembership(
+  admin: Client,
+  workspaceId: string,
+  userId: string,
+  role: 'owner' | 'admin' | 'operator',
+): Promise<void> {
+  await admin.query('INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, $3)', [
+    workspaceId,
+    userId,
+    role,
+  ]);
+}

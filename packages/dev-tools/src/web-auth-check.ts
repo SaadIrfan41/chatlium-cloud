@@ -9,6 +9,7 @@
 import { sessionSchema } from '@chatlium/auth';
 import { createSealer } from '@chatlium/crypto';
 import { z } from 'zod';
+import { FORM, Jar, location, out, request } from './web-client.ts';
 
 const env = z
   .object({
@@ -22,66 +23,11 @@ const env = z
   })
   .parse(process.env, { reportInput: false });
 
-const out = (line: string): void => void process.stdout.write(`${line}\n`);
 const app = (path: string): URL => new URL(path, env.APP_BASE_URL);
-
-class Jar {
-  private readonly cookies = new Map<string, string>();
-  header(): string {
-    return [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
-  }
-  absorb(response: Response, label?: string): void {
-    for (const raw of response.headers.getSetCookie()) {
-      const [pair = '', ...attributes] = raw.split(';');
-      const index = pair.indexOf('=');
-      const name = pair.slice(0, index);
-      const value = pair.slice(index + 1);
-      if (label !== undefined) {
-        out(
-          `${label.padEnd(9)} Set-Cookie ${name}=<${value.length} chars>;${attributes.join(';')}`,
-        );
-      }
-      if (value === '' || /expires=thu, 01 jan 1970/i.test(raw)) {
-        this.cookies.delete(name);
-      } else {
-        this.cookies.set(name, value);
-      }
-    }
-  }
-  get(name: string): string | undefined {
-    return [...this.cookies].find(([k]) => k.includes(name))?.[1];
-  }
-  put(name: string, value: string): void {
-    this.cookies.set(name, value);
-  }
-}
-
-async function request(
-  jar: Jar,
-  url: URL,
-  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
-  label?: string,
-): Promise<Response> {
-  const response = await fetch(url, {
-    ...init,
-    redirect: 'manual',
-    headers: { ...init.headers, cookie: jar.header() },
-  });
-  jar.absorb(response, label);
-  return response;
-}
-
-function location(response: Response, base: URL): URL {
-  const value = response.headers.get('location');
-  if (value === null) {
-    throw new Error(`expected a redirect from ${base.pathname}, got HTTP ${response.status}`);
-  }
-  return new URL(value, base);
-}
 
 const appJar = new Jar();
 const idpJar = new Jar();
-const form = { 'content-type': 'application/x-www-form-urlencoded' };
+const form = FORM;
 
 // Sign in through the app, exactly as a browser would.
 const login = await request(appJar, app('/api/auth/login'), {}, 'login');
