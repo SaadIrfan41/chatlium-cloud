@@ -12,7 +12,9 @@
     "web:auth-check": "node --env-file=../../.env src/web-auth-check.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "3.1164.0"
+    "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
+    "@chatlium/auth": "workspace:*",
+    "@chatlium/crypto": "workspace:*"
   },
   "devDependencies": {
     "@chatlium/tsconfig": "workspace:*",

@@ -1,17 +1,33 @@
 import 'server-only';
+import { UnauthenticatedError, type SessionUser } from '@chatlium/auth';
 import { cookies } from 'next/headers';
 import { cache } from 'react';
-import { sessionCookieName, sessions, sessionSchema, type Session } from './cookies.ts';
+import { sessions } from './cookies.ts';
 
 /**
- * The signed-in user, or undefined. Reads and unseals the session cookie; a tampered, expired or
- * foreign cookie counts as signed out. Cached for the duration of one request.
- * Step 1.11 adds ID-token verification on refresh and the application user ID.
+ * The signed-in user, or undefined. Server Components and Server Functions use this; Route
+ * Handlers call `sessions().requireSession(request)` directly. The proxy (src/proxy.ts) has
+ * already refreshed a stale session for this request. Cached for the duration of one request.
  */
-export const getSession = cache(async (): Promise<Session | undefined> => {
-  const sealed = (await cookies()).get(sessionCookieName())?.value;
-  if (sealed === undefined) {
+export const getSession = cache(async (): Promise<SessionUser | undefined> => {
+  const sealed = (await cookies()).get(sessions().cookieName)?.value;
+  const session = await sessions().read(sealed);
+  if (session === undefined) {
     return undefined;
   }
-  return sessions().unseal(sealed, sessionSchema);
+  return {
+    userId: session.userId,
+    cognitoSub: session.cognitoSub,
+    email: session.email,
+    csrf: session.csrf,
+  };
 });
+
+/** Like getSession, but throws UnauthenticatedError when nobody is signed in. */
+export async function requireSessionUser(): Promise<SessionUser> {
+  const user = await getSession();
+  if (user === undefined) {
+    throw new UnauthenticatedError();
+  }
+  return user;
+}

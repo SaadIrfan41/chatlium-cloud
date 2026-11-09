@@ -7,7 +7,7 @@ import {
   MIGRATIONS_SCHEMA,
   OWNER_ROLE,
   runMigrations,
-} from '../../src/index.ts';
+} from '../../src/admin.ts';
 import { connect, startPostgres, urlFor } from './postgres.ts';
 
 const OWNER_PASSWORD = 'owner-test-password-0123456789abcdef';

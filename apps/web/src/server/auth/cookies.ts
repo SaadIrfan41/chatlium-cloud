@@ -1,4 +1,5 @@
 import 'server-only';
+import { createSessionStore, type SessionStore } from '@chatlium/auth';
 import { createSealer, type Sealer } from '@chatlium/crypto';
 import { z } from 'zod';
 import { config } from '../config.ts';
@@ -37,30 +38,24 @@ export function cookieOptions(maxAge: number): CookieOptions {
   return { httpOnly: true, secure: isSecure(), sameSite: 'lax', path: '/', maxAge };
 }
 
-/** What the session cookie holds. No access or ID token is kept; the refresh token never leaves the server. */
-export const sessionSchema = z.object({
-  sub: z.string().min(1),
-  email: z.string().min(1),
-  /** Synchronizer token for state-changing form posts (amendments §2). */
-  csrf: z.string().min(16),
-  refreshToken: z.string().min(1).optional(),
-});
-export type Session = z.infer<typeof sessionSchema>;
-
 /** The in-progress sign-in: what the callback must check. */
 export const transactionSchema = z.object({
   state: z.string().min(16),
   nonce: z.string().min(16),
   codeVerifier: z.string().min(43),
 });
-export type SignInTransaction = z.infer<typeof transactionSchema>;
 
-let sessionSealer: Sealer | undefined;
+let sessionStore: SessionStore | undefined;
 let transactionSealer: Sealer | undefined;
 
-export function sessions(): Sealer {
-  sessionSealer ??= createSealer(config().SESSION_SEALING_KEY, 'session');
-  return sessionSealer;
+/** Sealing, reading and requireSession for the session cookie (@chatlium/auth). */
+export function sessions(): SessionStore {
+  sessionStore ??= createSessionStore({
+    sealer: createSealer(config().SESSION_SEALING_KEY, 'session'),
+    cookieName: sessionCookieName(),
+    ttlSeconds: SESSION_TTL_SECONDS,
+  });
+  return sessionStore;
 }
 
 export function transactions(): Sealer {

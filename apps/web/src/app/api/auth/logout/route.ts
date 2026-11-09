@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import * as oidc from 'openid-client';
 import { NextResponse, type NextRequest } from 'next/server';
-import { sessionCookieName, sessions, sessionSchema } from '@/server/auth/cookies';
+import { sessions } from '@/server/auth/cookies';
 import { logoutUrl, oidcConfig } from '@/server/auth/oidc';
 import { config, log } from '@/server/config';
 
@@ -21,8 +21,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
-  const sealed = request.cookies.get(sessionCookieName())?.value;
-  const session = sealed === undefined ? undefined : await sessions().unseal(sealed, sessionSchema);
+  const session = await sessions().read(request.cookies.get(sessions().cookieName)?.value);
   if (session === undefined) {
     return NextResponse.redirect(new URL('/', config().APP_BASE_URL), 303);
   }
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const response = NextResponse.redirect(await logoutUrl(), 303);
-  response.cookies.delete(sessionCookieName());
+  response.cookies.delete(sessions().cookieName);
   log().info({ event: 'signout.succeeded' }, 'signed out');
   return response;
 }

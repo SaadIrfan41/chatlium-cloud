@@ -1,6 +1,6 @@
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { Client } from 'pg';
-import { APP_ROLE, bootstrapRoles, OWNER_ROLE, runMigrations } from '../../src/index.ts';
+import { APP_ROLE, bootstrapRoles, OWNER_ROLE, runMigrations } from '../../src/admin.ts';
 import { connect, startPostgres, urlFor } from './postgres.ts';
 
 export const OWNER_PASSWORD = 'owner-test-password-0123456789abcdef';

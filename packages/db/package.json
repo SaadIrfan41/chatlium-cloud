@@ -5,7 +5,8 @@
   "description": "Database schema, migrations, roles and tenant-context helpers",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./admin": "./src/admin.ts"
   },
   "scripts": {
     "lint": "oxlint --type-aware --deny-warnings .",

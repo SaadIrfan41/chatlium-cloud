@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "@chatlium/auth": "workspace:*",
     "@chatlium/config": "workspace:*",
     "@chatlium/crypto": "workspace:*",
+    "@chatlium/db": "workspace:*",
     "@chatlium/observability": "workspace:*",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.2",

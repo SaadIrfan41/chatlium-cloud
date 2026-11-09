@@ -1,0 +1,25 @@
+{
+  "name": "@chatlium/auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ID token verification, session loading and membership checks",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chatlium/crypto": "workspace:*",
+    "jose": "6.2.15",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@chatlium/tsconfig": "workspace:*",
+    "@types/node": "26.6.6",
+    "vitest": "5.1.0"
+  }
+}
