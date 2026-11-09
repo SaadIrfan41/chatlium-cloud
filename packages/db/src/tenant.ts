@@ -22,22 +22,38 @@ function requireUuid(value: string, kind: 'workspace' | 'user'): string {
   return value;
 }
 
+export interface WorkspaceContext {
+  readonly workspaceId: string;
+  /**
+   * The acting user. Web requests always pass it: row-level security then also requires that
+   * user to be a member of the workspace (ADR 0003). Workers omit it, because a job carries a
+   * workspace validated at ingestion but no user (amendments §4).
+   */
+  readonly userId?: string;
+}
+
 /**
- * Runs `fn` inside a transaction whose row-level security context is one workspace.
+ * Runs `fn` inside a transaction whose row-level security context is one workspace, and
+ * optionally the acting user.
  *
- * The context is set with `set_config('app.workspace_id', $1, true)`: a bind parameter (SET LOCAL
- * cannot take one, so string interpolation would be an injection path), and transaction-local
- * (`true`), so it ends with the transaction and cannot leak to the next request on a pooled
- * connection. Callers must check membership first (requireWorkspaceRole, Step 1.12).
+ * The context is set with `set_config(name, $1, true)`: a bind parameter (SET LOCAL cannot take
+ * one, so string interpolation would be an injection path), and transaction-local (`true`), so it
+ * ends with the transaction and cannot leak to the next request on a pooled connection.
+ * Callers still check membership and role in application code first (requireWorkspaceRole,
+ * Step 1.12); the database check is the second layer.
  */
 export async function withWorkspace<T>(
   db: NodePgDatabase,
-  workspaceId: string,
+  context: WorkspaceContext,
   fn: (tx: TenantTransaction) => Promise<T>,
 ): Promise<T> {
-  const id = requireUuid(workspaceId, 'workspace');
+  const workspaceId = requireUuid(context.workspaceId, 'workspace');
+  const userId = context.userId === undefined ? undefined : requireUuid(context.userId, 'user');
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT set_config('app.workspace_id', ${id}, true)`);
+    await tx.execute(sql`SELECT set_config('app.workspace_id', ${workspaceId}, true)`);
+    if (userId !== undefined) {
+      await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    }
     return fn(tx);
   });
 }

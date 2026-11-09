@@ -66,14 +66,14 @@ async function settingsInside(tx: TenantTransaction): Promise<Omit<SessionState,
 
 describe('withWorkspace', () => {
   it('sets the workspace context inside the transaction only', async () => {
-    const inside = await withWorkspace(single.db, workspaceA, settingsInside);
+    const inside = await withWorkspace(single.db, { workspaceId: workspaceA }, settingsInside);
 
     expect(inside).toEqual({ workspace: workspaceA, user: null });
   });
 
   it('leaves no workspace context on the same connection once it completes', async () => {
     const before = await sessionState(single);
-    await withWorkspace(single.db, workspaceA, async () => undefined);
+    await withWorkspace(single.db, { workspaceId: workspaceA }, async () => undefined);
 
     const after = await sessionState(single);
 
@@ -85,7 +85,7 @@ describe('withWorkspace', () => {
     const failure = new Error('boom');
 
     await expect(
-      withWorkspace(single.db, workspaceA, async (tx) => {
+      withWorkspace(single.db, { workspaceId: workspaceA }, async (tx) => {
         await tx
           .insert(schema.documents)
           .values({ workspaceId: workspaceA, title: 'rolled-back', s3Key: 'k' });
@@ -99,7 +99,7 @@ describe('withWorkspace', () => {
   });
 
   it('scopes queries to the workspace through row-level security', async () => {
-    const titles = await withWorkspace(single.db, workspaceB, async (tx) =>
+    const titles = await withWorkspace(single.db, { workspaceId: workspaceB }, async (tx) =>
       (await tx.select({ title: schema.documents.title }).from(schema.documents)).map(
         (d) => d.title,
       ),
@@ -112,7 +112,7 @@ describe('withWorkspace', () => {
     const pooled = createDatabase(fixture.appUrl, { max: 2 });
     try {
       const read = (workspaceId: string) =>
-        withWorkspace(pooled.db, workspaceId, async (tx) => {
+        withWorkspace(pooled.db, { workspaceId }, async (tx) => {
           await tx.execute(sql`SELECT pg_sleep(0.2)`); // overlap the two transactions
           return (await tx.select({ title: schema.documents.title }).from(schema.documents)).map(
             (d) => d.title,
@@ -133,7 +133,7 @@ describe('withWorkspace', () => {
     let called = false;
 
     await expect(
-      withWorkspace(single.db, injection, async () => {
+      withWorkspace(single.db, { workspaceId: injection }, async () => {
         called = true;
       }),
     ).rejects.toBeInstanceOf(InvalidTenantIdError);

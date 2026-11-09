@@ -11,6 +11,7 @@
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc -p .",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:isolation-proof": "node scripts/isolation-proof.ts",
     "db:bootstrap": "node --env-file=../../.env scripts/bootstrap.ts",
     "db:verify-roles": "node --env-file=../../.env scripts/verify-roles.ts",
     "db:generate": "drizzle-kit generate",
