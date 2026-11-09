@@ -40,13 +40,16 @@ services:
     restart: unless-stopped
 
   floci:
-    # Local AWS emulator (Cognito now; SQS, S3, Secrets Manager and KMS later). Pinned by digest.
+    # Local AWS emulator (Cognito and S3 now; SQS, Secrets Manager and KMS later). Pinned by digest.
     image: floci/floci:2.4.0@sha256:5ee85db604c4aa74ac76e07ea5cc83086f37bb472bf3dbb97e34019e48efae9c
     environment:
       FLOCI_DEFAULT_REGION: us-east-1
       # Keep the user pool (and its ID in .env) across restarts.
       FLOCI_STORAGE_MODE: persistent
       FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      # Verify SigV4 signatures like AWS does (off by default in Floci). Without it, a presigned S3
+      # URL edited to another key, size or content type is accepted (found in Step 2.2).
+      FLOCI_AUTH_VALIDATE_SIGNATURES: 'true'
       # FLOCI_HOSTNAME is left unset: in Phase 1 the browser and the Next.js dev server both reach
       # Floci on localhost:4566, so the Cognito issuer URL is the same for both. Revisit in Phase 3
       # when the web app runs in a container (see the version research notes).

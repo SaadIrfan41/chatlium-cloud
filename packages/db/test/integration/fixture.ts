@@ -57,7 +57,8 @@ export async function seedDocument(
   title: string,
 ): Promise<void> {
   await admin.query(
-    "INSERT INTO documents (workspace_id, title, s3_key) VALUES ($1, $2, 'test-key')",
+    `INSERT INTO documents (workspace_id, title, s3_key, content_type, size_bytes)
+     VALUES ($1, $2, 'test/' || gen_random_uuid(), 'text/plain', 1)`,
     [workspaceId, title],
   );
 }

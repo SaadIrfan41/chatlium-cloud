@@ -8,6 +8,7 @@ const completeEnv = {
   DATABASE_URL: 'postgres://chatlium_app:app-password@localhost:5432/chatlium',
   REDIS_URL: 'redis://localhost:6379',
   AWS_REGION: 'us-east-1',
+  DOCUMENTS_BUCKET: 'chatlium-documents-test',
   AWS_ENDPOINT_URL: 'http://localhost:4566',
   COGNITO_USER_POOL_ID: 'us-east-1_abc123',
   COGNITO_CLIENT_ID: 'client-id-123',
@@ -71,6 +72,14 @@ describe('loadConfig', () => {
     const error = captureError({ ...completeEnv, AWS_REGION: 'nowhere', REDIS_URL: '' });
 
     expect(error.problems.map((p) => p.variable).toSorted()).toEqual(['AWS_REGION', 'REDIS_URL']);
+  });
+
+  it('rejects a bucket name S3 would refuse', () => {
+    const error = captureError({ ...completeEnv, DOCUMENTS_BUCKET: 'Documents_Bucket' });
+
+    expect(error.problems).toEqual([
+      { variable: 'DOCUMENTS_BUCKET', problem: 'must be a valid S3 bucket name' },
+    ]);
   });
 
   it('never includes a secret value in the error', () => {

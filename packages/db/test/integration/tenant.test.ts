@@ -86,9 +86,13 @@ describe('withWorkspace', () => {
 
     await expect(
       withWorkspace(single.db, { workspaceId: workspaceA }, async (tx) => {
-        await tx
-          .insert(schema.documents)
-          .values({ workspaceId: workspaceA, title: 'rolled-back', s3Key: 'k' });
+        await tx.insert(schema.documents).values({
+          workspaceId: workspaceA,
+          title: 'rolled-back',
+          s3Key: 'k-rolled-back',
+          contentType: 'text/plain',
+          sizeBytes: 1,
+        });
         throw failure;
       }),
     ).rejects.toBe(failure);

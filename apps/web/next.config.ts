@@ -7,9 +7,12 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     '@chatlium/auth',
     '@chatlium/config',
+    '@chatlium/contracts',
     '@chatlium/crypto',
     '@chatlium/db',
     '@chatlium/observability',
+    '@chatlium/queue',
+    '@chatlium/storage',
   ],
   async headers() {
     return [
