@@ -4,6 +4,8 @@ import type { ClientBase } from 'pg';
 export const OWNER_ROLE = 'chatlium_owner';
 /** Used by the application. Not a superuser and cannot bypass row-level security. */
 export const APP_ROLE = 'chatlium_app';
+/** Schema holding Drizzle's migration history. Owned by chatlium_owner; the app has no access. */
+export const MIGRATIONS_SCHEMA = 'drizzle';
 
 export interface BootstrapOptions {
   /** Database the roles are granted access to. */
@@ -38,11 +40,23 @@ export async function bootstrapRoles(admin: ClientBase, options: BootstrapOption
       OWNER_ROLE,
       APP_ROLE,
     ]);
+    // Drizzle's migrator always runs CREATE SCHEMA IF NOT EXISTS, and PostgreSQL checks the
+    // CREATE privilege before checking existence. CREATE on a database allows schemas only, not roles.
+    await execFormatted(admin, 'GRANT CREATE ON DATABASE %I TO %I', [options.database, OWNER_ROLE]);
 
     // The owner owns the schema, so tables it creates in migrations are owned by it.
     await execFormatted(admin, 'ALTER SCHEMA public OWNER TO %I', [OWNER_ROLE]);
     await admin.query('REVOKE ALL ON SCHEMA public FROM PUBLIC');
     await execFormatted(admin, 'GRANT USAGE ON SCHEMA public TO %I', [APP_ROLE]);
+
+    // Migration bookkeeping lives in its own schema, owned by the owner. The app has no access
+    // to it, so it cannot read or tamper with the migration history.
+    await execFormatted(admin, 'CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I', [
+      MIGRATIONS_SCHEMA,
+      OWNER_ROLE,
+    ]);
+    await execFormatted(admin, 'ALTER SCHEMA %I OWNER TO %I', [MIGRATIONS_SCHEMA, OWNER_ROLE]);
+    await execFormatted(admin, 'REVOKE ALL ON SCHEMA %I FROM PUBLIC', [MIGRATIONS_SCHEMA]);
 
     // Tables and sequences the owner creates later are usable by the app, with DML only:
     // no TRUNCATE, REFERENCES, TRIGGER or DDL.
