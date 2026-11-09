@@ -10,3 +10,11 @@ export {
   type WorkspaceContext,
 } from './tenant.ts';
 export { upsertUserByCognitoSub, type CognitoIdentity } from './users.ts';
+export {
+  findMembershipRole,
+  listDocuments,
+  listUserWorkspaces,
+  type DocumentSummary,
+  type MembershipRole,
+  type UserWorkspace,
+} from './workspaces.ts';

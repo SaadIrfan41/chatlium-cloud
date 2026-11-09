@@ -17,3 +17,13 @@ export {
   type SessionStoreOptions,
   type SessionUser,
 } from './session.ts';
+export {
+  createWorkspaceGuard,
+  ForbiddenError,
+  roleAtLeast,
+  WORKSPACE_ROLES,
+  type WorkspaceGuard,
+  type WorkspaceGuardOptions,
+  type WorkspaceMember,
+  type WorkspaceRole,
+} from './workspace-role.ts';

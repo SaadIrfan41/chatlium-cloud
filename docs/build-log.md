@@ -315,3 +315,32 @@ Surprises:
 - **Turbopack treats `new URL('../drizzle', import.meta.url)` as a bundled asset** and failed on the migrations folder. The real fix was a design one: `@chatlium/db` now has two entry points, the runtime API (`.`) and `./admin` (role bootstrap and migrations). The web app no longer bundles administrative code.
 - Floci keeps a managed-login session cookie, so a second sign-in skipped the form. That matches AWS behaviour.
 - `seal()` threw synchronously on a schema error. It is now `async`, so callers always get a rejected promise.
+
+**1.12 Membership and role checks (2026-11-09).**
+
+- `packages/auth`: `createWorkspaceGuard({ sessions, lookupRole })` → `requireWorkspaceRole(request, workspaceId, minimumRole)`. It calls `requireSession`, then looks up the caller's own membership (`withUser`, so the `own_memberships` policy applies), and returns `{ user, workspaceId, role }`. Roles rank `operator < admin < owner`. Every refusal throws the same `ForbiddenError`, with no reason attached: not a member, role too low, no such workspace, or not even a UUID (rejected before any query). The membership lookup is injected, so the package stays free of a database dependency and unit-testable.
+- `packages/db`: `findMembershipRole`, `listUserWorkspaces` (through `withUser`) and `listDocuments` (through `withWorkspace({ workspaceId, userId })`, and also filtered by `workspace_id` explicitly). A new `@chatlium/db/testing` entry exposes the Testcontainers fixture to other packages' tests.
+- Web: `GET /api/workspaces` and `GET /api/workspaces/:id/documents` (operator or higher). Handlers live in `src/server/api/workspaces.ts` without `server-only`, so integration tests drive them directly; the route files only wire them. Responses are `no-store`. A missing session gives `401 {"error":"unauthenticated"}`; every authorization failure gives the byte-identical `403 {"error":"forbidden"}`.
+- The dashboard lists the signed-in user's workspaces with their role.
+- Lint now forbids `@chatlium/db/admin` and `@chatlium/db/testing` in `apps/*/src` (probed with a deliberate import, then removed).
+- Dev tools: `db:seed-dev` (idempotent; looks up each Floci test user's `sub`, so the seeded user row is the one sign-in uses) creates Acme Support (operator.a, operator) and Beta Help Desk (operator.b, admin). `web:workspace-check` is the guide's manual check.
+
+Done-when evidence: 9 integration tests in `apps/web` against a migrated Postgres, as `chatlium_app`. A member gets 200 with only their own workspace's documents, and a higher role also passes. A non-member's 403 equals, in status, content type, cache header and body, the 403 for a non-existent workspace and for a malformed ID. A user with no memberships gets the same 403. A role below the minimum gets 403 (operator is the lowest role, so this is checked through the guard with `admin`/`owner` minimums against the real lookup). No session gets 401. `/api/workspaces` lists only the caller's own workspaces. Plus 15 unit tests for the guard and the role ranking.
+
+Live (`pnpm --filter @chatlium/dev-tools web:workspace-check`):
+
+```
+operator.a@chatlium.test sees: Acme Support (operator)
+operator.b@chatlium.test sees: Beta Help Desk (admin)
+ok   operator.a@chatlium.test: own workspace documents -> 200 (Refund policy, Shipping times)
+ok   operator.a@chatlium.test: other tenant's workspace -> 403 {"error":"forbidden"}
+ok   operator.a@chatlium.test: non-existent workspace   -> 403 {"error":"forbidden"} (identical)
+ok   operator.b@chatlium.test: own workspace documents -> 200 (Account recovery)
+ok   operator.b@chatlium.test: other tenant's workspace -> 403 {"error":"forbidden"}
+ok   operator.b@chatlium.test: non-existent workspace   -> 403 {"error":"forbidden"} (identical)
+ok   no session: GET /api/workspaces -> 401
+```
+
+In the browser, operator.a's dashboard shows only Acme Support (Operator).
+
+Mutation checks (each reverted): ranking with `>` instead of `>=`, skipping the role comparison, skipping the UUID check (a malformed ID then reaches Postgres and errors), looking up the membership without the workspace condition, adding a reason to the 403 body, and dropping `no-store` each fail a test. **Not caught:** removing the explicit `workspace_id` filter from `listDocuments`. Row-level security still returns only the workspace's rows, so this mutant is equivalent while RLS is on. The filter stays as defense in depth, and RLS itself is proven by `test:isolation-proof`.

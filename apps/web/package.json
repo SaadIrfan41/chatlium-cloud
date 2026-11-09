@@ -9,7 +9,8 @@
     "build": "node scripts/next.ts build",
     "start": "node scripts/next.ts start --port 3000",
     "lint": "oxlint --type-aware --deny-warnings .",
-    "typecheck": "node scripts/next.ts typegen && tsc -p ."
+    "typecheck": "node scripts/next.ts typegen && tsc -p .",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -37,6 +38,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "tailwindcss": "4.3.5",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
   }
 }
