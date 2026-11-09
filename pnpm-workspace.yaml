@@ -1,3 +1,13 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Install scripts are denied unless a package is proven to need one (supply-chain policy, see build log 1.5).
+allowBuilds:
+  # esbuild ships prebuilt platform binaries as optional dependencies; its postinstall only verifies them.
+  esbuild: false
+  # Native SSH support for Testcontainers' Docker client. Not used: Docker is local, not reached over SSH.
+  ssh2: false
+  cpu-features: false
+  # Version-check script only.
+  protobufjs: false

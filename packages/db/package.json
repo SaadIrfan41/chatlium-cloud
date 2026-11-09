@@ -1,0 +1,31 @@
+{
+  "name": "@chatlium/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Database schema, migrations, roles and tenant-context helpers",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsc -p .",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:bootstrap": "node --env-file=../../.env scripts/bootstrap.ts",
+    "db:verify-roles": "node --env-file=../../.env scripts/verify-roles.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@chatlium/tsconfig": "workspace:*",
+    "@testcontainers/postgresql": "12.2.1",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "testcontainers": "12.2.1",
+    "vitest": "5.1.0"
+  }
+}
