@@ -18,6 +18,7 @@ docker compose up -d --wait # PostgreSQL 18 + pgvector, Redis 8, Floci (local AW
 pnpm --filter @chatlium/db db:bootstrap            # database roles (once)
 pnpm --filter @chatlium/db db:migrate              # schema and row-level security
 pnpm --filter @chatlium/dev-tools cognito:setup    # Cognito user pool + test users in Floci
+pnpm --filter @chatlium/web dev                    # http://localhost:3000 (sign in with a test user from .env)
 pnpm lint && pnpm typecheck && pnpm test
 ```
 

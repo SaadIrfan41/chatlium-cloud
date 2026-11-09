@@ -11,6 +11,7 @@ const completeEnv = {
   AWS_ENDPOINT_URL: 'http://localhost:4566',
   COGNITO_USER_POOL_ID: 'us-east-1_abc123',
   COGNITO_CLIENT_ID: 'client-id-123',
+  COGNITO_CLIENT_SECRET: 'test-client-secret',
   COGNITO_ISSUER: 'http://localhost:4566/us-east-1_abc123',
   SESSION_SEALING_KEY: 'test-only-sealing-key-0123456789abcdef',
   GEMINI_API_KEY_SECRET_ID: 'chatlium/dev/gemini-api-key',
