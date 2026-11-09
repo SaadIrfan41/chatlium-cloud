@@ -372,3 +372,9 @@ Done-when evidence, from probe PR #14 (closed, never merged):
 1. Added `packages/config/test/ci-probe.test.ts`, which asserts `1 + 1 === 3`. CI showed **Lint, typecheck, unit tests, build: fail** (`AssertionError: expected 2 to be 3`) and **Integration tests: pass**.
 2. With the PR marked ready for review, GitHub reported `mergeable: MERGEABLE` (no conflicts) and `mergeStateStatus: BLOCKED`. The failing required check was the only remaining cause.
 3. Removing the test made both checks pass (unit job 40 s, integration job 53 s), and the PR became `CLEAN`, so it could be merged. It was closed instead.
+
+**1.13 follow-up: Renovate config fixes (2026-11-09).** Renovate was enabled on the Mend portal. It is installed as "Silent" by default, which scans but opens nothing, so "Automated PRs" was switched on and "Require config file" left on. Its first run created the Dependency Dashboard (issue #15) and showed three gaps, now fixed and confirmed by a local `renovate --platform=local --dry-run=lookup`:
+
+- `config:recommended` ignores `**/test/**`, so the Testcontainers image pin was never seen. `ignorePaths` now excludes only `node_modules`, and the regex manager detects `pgvector/pgvector` in `postgres.ts`.
+- `rangeStrategy: pin` would have pinned the `engines` ranges for Node and pnpm. A rule keeps them as ranges (`replace`).
+- `packages/config` had `"@types/node": "^26.6.6"`, the only non-exact version in the repo. It is now `26.6.6`.
