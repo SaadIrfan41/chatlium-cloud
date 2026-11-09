@@ -14,7 +14,10 @@ Requires Node 26, pnpm 12 and Docker.
 ```bash
 cp .env.example .env        # then set a password in .env
 pnpm install
-docker compose up -d --wait # PostgreSQL 18 + pgvector, Redis 8
+docker compose up -d --wait # PostgreSQL 18 + pgvector, Redis 8, Floci (local AWS)
+pnpm --filter @chatlium/db db:bootstrap            # database roles (once)
+pnpm --filter @chatlium/db db:migrate              # schema and row-level security
+pnpm --filter @chatlium/dev-tools cognito:setup    # Cognito user pool + test users in Floci
 pnpm lint && pnpm typecheck && pnpm test
 ```
 

@@ -39,6 +39,31 @@ services:
       retries: 10
     restart: unless-stopped
 
+  floci:
+    # Local AWS emulator (Cognito now; SQS, S3, Secrets Manager and KMS later). Pinned by digest.
+    image: floci/floci:2.4.0@sha256:5ee85db604c4aa74ac76e07ea5cc83086f37bb472bf3dbb97e34019e48efae9c
+    environment:
+      FLOCI_DEFAULT_REGION: us-east-1
+      # Keep the user pool (and its ID in .env) across restarts.
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      # FLOCI_HOSTNAME is left unset: in Phase 1 the browser and the Next.js dev server both reach
+      # Floci on localhost:4566, so the Cognito issuer URL is the same for both. Revisit in Phase 3
+      # when the web app runs in a container (see the version research notes).
+    ports:
+      - '127.0.0.1:${FLOCI_PORT:-4566}:4566'
+    volumes:
+      # No Docker socket: Cognito, SQS, S3, Secrets Manager and KMS run inside Floci's own process.
+      - floci-data:/app/data
+    healthcheck:
+      # The image has bash but no curl, so check the port with bash's /dev/tcp.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/4566']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:
+  floci-data:
