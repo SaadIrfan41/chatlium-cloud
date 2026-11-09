@@ -484,3 +484,46 @@ Mutation checks: 28 deliberate bugs, each reverted. The first run caught 25. The
 - **A lost race reported as `failed`.** Nothing tested another delivery winning between the read and the update. A new test makes the storage stub fail the document mid-check, and expects `skipped` with the first reason kept.
 
 After those tests, all 28 are caught.
+
+**2.4 Chunking (2026-11-10).** `chunkText(text, contentType)` in `packages/knowledge/src/chunking` splits extracted text into chunks. It is deterministic and has no dependencies. Each chunk records:
+
+- `start` and `end`: offsets into the extracted text, with `text === source.slice(start, end)`, so a citation can point back to the source;
+- `text`: the passage as written, which is the evidence shown;
+- `headingPath`: the Markdown headings above it, outermost first;
+- `embeddingText`: what 2.5 embeds and full-text indexes.
+
+The parts:
+
+- **Constants:** `CHUNK_TARGET_CHARS = 800` is the maximum length, about 150 to 200 English words. `CHUNK_OVERLAP_CHARS = 100` is the most a chunk repeats from the end of the previous one. A test pins both values.
+- **Recursive splitter:** a range is only cut when it is longer than the target. It tries the coarsest boundary first: paragraph breaks, then line breaks, sentence ends, and spaces. As a last resort it uses fixed 100-character pieces, which never split a surrogate pair. I added line and word levels to the guide's paragraph → sentence → character order, so a list or a long sentence is cut at a natural place before falling back to raw characters.
+- **Packing:** the pieces are packed greedily into chunks. Each next chunk starts with the trailing pieces of the previous one that fit in the overlap, and it always reaches past the previous chunk.
+- **Markdown (amendments §12.5):**
+  - Every ATX heading (`#` to `######`, at most three spaces in) starts a new chunk and sets the heading path. Headings inside fenced code blocks are ignored.
+  - Overlap never crosses a heading, and a long section is split by the same recursive splitter, keeping its path on every piece.
+  - `embeddingText` is `Refunds > Timelines`, a blank line, then the chunk's text. The evidence text has no prefix.
+  - A heading with nothing under it, such as a parent heading right before its first child, gives no chunk of its own. Its title still appears in the child's path.
+  - Setext headings (text underlined with `===`) are not recognised, and stay ordinary text.
+- **Other types:** plain text, PDF and JSON use the recursive splitter alone. For PDFs, a chunk's page can be worked out from `start` and the extractor's `pageOffsets`.
+- **Out of scope:** the other half of §12.5, `content_hash` reuse of vectors, belongs to 2.5. It needs the chunks table and the embedding calls.
+
+Done-when evidence: 23 chunking tests pass.
+
+- **The guide's four:**
+  - empty input gives no chunks;
+  - a short input gives one chunk, with its offsets;
+  - a long input gives chunks within the limit, each overlapping the previous one by 1 to 100 characters;
+  - the same input always gives the same chunks, with a committed snapshot of the offsets.
+- **Amendments §12.5:** Markdown gives one chunk per section with its path, and the heading path appears only in `embeddingText`.
+- **Every test also checks** that offsets match the text, that no chunk is over the limit or starts or ends with whitespace, that each chunk reaches past the previous one, and that every non-whitespace character is in some chunk.
+
+Mutation checks: 23 deliberate bugs, each reverted. The first run caught 17. Four of the misses were real gaps in the tests:
+
+- **Removing the paragraph level went unnoticed.** Line breaks also cut at blank lines, so the paragraph test still passed. A new test uses two paragraphs of ten short lines each: without the paragraph level, a chunk mixes the two.
+- **Removing the progress guard went unnoticed.** Without it, a chunk can be nothing but the previous chunk's overlap. A new 700/90/750-character case hits that, and every test now checks that each chunk reaches past the previous one.
+- **A `#` line indented four spaces (code, not a heading) wasn't tested.** The existing example had the `#` mid-line.
+- **A `~~~` line closing a backtick fence wasn't tested.** One is now inside one.
+
+After those tests, 21 of 23 are caught. The two left are equivalent:
+
+- keeping a cut at the very end of a range only adds an empty piece, which is dropped;
+- splitting a range of exactly 800 characters into finer pieces gets packed back into the same chunk.

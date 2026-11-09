@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`chunkText: the recursive splitter > always produces the same chunks for the same input 1`] = `
+[
+  [
+    0,
+    760,
+  ],
+  [
+    669,
+    1462,
+  ],
+  [
+    1405,
+    2198,
+  ],
+  [
+    2141,
+    2934,
+  ],
+  [
+    2877,
+    3670,
+  ],
+  [
+    3613,
+    4374,
+  ],
+  [
+    4274,
+    5074,
+  ],
+  [
+    4974,
+    5774,
+  ],
+  [
+    5674,
+    6174,
+  ],
+]
+`;

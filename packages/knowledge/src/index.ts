@@ -10,3 +10,9 @@ export {
   type DocumentExtraction,
   type ExtractDocumentDependencies,
 } from './extract-document.ts';
+export {
+  CHUNK_OVERLAP_CHARS,
+  CHUNK_TARGET_CHARS,
+  chunkText,
+  type Chunk,
+} from './chunking/chunk.ts';
