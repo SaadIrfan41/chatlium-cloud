@@ -48,3 +48,6 @@ Thumbs.db
 
 # Agent skill copies for other tools (Claude Code reads .claude/skills)
 .agents/
+
+# Local reference material (third-party course code), never committed
+/Advance rag/

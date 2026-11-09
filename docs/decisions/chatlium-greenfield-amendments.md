@@ -209,6 +209,81 @@ Widget, queue, workers, and realtime start in later phases, as already planned.
 
 ---
 
-## 12. Next step
+## 12. Retrieval quality (added 2026-11-10)
+
+The guide's Phase 2 retrieval is a baseline: recursive chunks, vector-only search, the raw visitor message as the query, and escalation on a similarity threshold. That baseline misses exact identifiers (order numbers, error codes, product codes), retrieves poorly for follow-up questions, and has no measurement behind its threshold. These five changes fix that inside the existing design. They add no new service or model provider, and they keep every query tenant-scoped under RLS.
+
+The ideas come from a study of a multi-lab RAG course (`docs/research/2026-11-10-advanced-rag-labs-guide.md`). They are adopted as ideas. No course code is copied.
+
+### 12.1 Hybrid search (Step 2.6)
+
+Step 2.6 becomes **hybrid search with tenant scope**.
+
+- `document_chunks` gets a generated full-text column, `search_text tsvector GENERATED ALWAYS AS (to_tsvector('simple', text)) STORED`, with a GIN index. Use the `simple` configuration so identifiers and product names are not stemmed. **Verify** in a test how the parser tokenizes identifiers like `ORD-1234` and `NX-742-A`, and add a normalized form if they do not match reliably.
+- `search(workspaceId, queryText, { topK, minScore })` runs two candidate searches in **one SQL statement** inside `withWorkspace`: vector (cosine distance on the HNSW index) and full-text (`ts_rank_cd` over an OR of the query's lexemes). Both take 20 candidates and apply the same filters: workspace, `ready` documents, and the recorded embedding model.
+- Merge the two lists with Reciprocal Rank Fusion, `score = Σ 1 / (60 + rank)`, deduplicated by chunk ID. The candidate depth (20) and the RRF constant (60) are named constants.
+- Output, per chunk: text, document ID, chunk ID, fused rank, cosine similarity, and whether it matched the full-text search. The Knowledge node output becomes `{ chunks, topVectorScore, lexicalHit }`. RRF scores are not comparable across queries, so they never feed the escalation rule.
+
+Tests, in addition to the guide's three:
+- An exact identifier present in one chunk ranks that chunk first, even when its vector score is not the highest.
+- A paraphrase with no shared words still finds the right chunk through the vector side.
+- A chunk found by both sides appears once.
+- A full-text match in workspace B never appears for workspace A.
+
+### 12.2 Standalone query rewrite for follow-ups (Step 2.10)
+
+A chat message like "and what about the second one?" is a poor search query. Before retrieval, the chat worker rewrites the message into one standalone question, **only when the conversation already has earlier messages**.
+
+- One structured-output call to the configured Gemini model (`generateObject` or its current equivalent in the Vercel AI SDK, **verify** the name), with a short timeout and temperature 0. It returns `{ standaloneQuery }`.
+- **Intent guard.** Before the call, extract from the current message the identifiers, numbers, quoted phrases and dates, using deterministic patterns. If the rewrite drops any of them, discard it and search with the original message. Also fall back to the original message on timeout or invalid output. Record the fallback reason on the execution step.
+- The rewrite is used **only for retrieval**. The LLM node still receives the visitor's original message and the history. The rewrite never appears in the answer, the evidence, or logs. Record its length and outcome only.
+- The call is recorded in `llm_calls` like any other LLM call, so it shows in usage and cost.
+
+Tests: a follow-up with a pronoun is rewritten; a rewrite that drops an identifier is rejected and the original is used; a first message is never rewritten; a provider failure falls back without failing the message.
+
+### 12.3 Citations by chunk, checked in code (Steps 2.9 and 2.10)
+
+- The LLM prompt lists the retrieved chunks with short labels, `[1]` to `[n]`. The server keeps the label-to-chunk-ID map. Raw IDs never go to the model.
+- The system prompt requires a label after each supported statement, and a fixed escalation-style reply when the chunks do not contain the answer.
+- When the stream completes, the worker parses the labels and keeps only those it supplied. It stores the cited chunk IDs with the assistant message in a `message_citations` table (`message_id`, `chunk_id`, `workspace_id`; RLS like every tenant table), and records a grounding status on the execution: `cited` or `uncited`. A label the server did not supply is dropped and counted.
+- **Number check.** Every number in the final answer must appear in at least one cited chunk. Otherwise, record the flag `unsupported_number` on the execution.
+- Tokens are already on the visitor's screen when these checks run, so the checks do not block the stream. They govern what is stored, what the operator sees in the run detail, and what the evaluation counts. Showing source titles to visitors is a per-workspace setting for Phase 7, off by default, because document titles may be internal.
+
+Tests: a supplied label is stored as a citation; an invented label is dropped; an answer with a number that is absent from the chunks is flagged.
+
+### 12.4 Golden set and retrieval metrics (new, between Steps 2.6 and 2.12)
+
+Add `packages/knowledge/eval`. The escalation threshold in Step 2.12 must be set from this harness, not by guessing.
+
+- **Corpus.** A small set of synthetic markdown support documents written for this repository, with refunds, shipping, accounts, product codes and error codes.
+- **Cases.** At least 25 JSONL cases, each tagged: `exact_identifier`, `paraphrase`, `follow_up` (with prior turns), `multi_part`, and `unanswerable` (expected to escalate). Chunk IDs are random UUIDs, so a case names its relevant evidence by fixture document plus a text snippet the relevant chunk must contain.
+- **Metrics.** For answerable cases: Hit@K, Recall@K, MRR and nDCG@K. For all cases: escalation accuracy (escalated exactly when expected).
+- **No API key in CI.** Embeddings for the fixture corpus and the queries are committed as a fixture file, keyed by model, dimensions and text hash. A refresh script, run by hand with a key, regenerates it. Everything else runs offline.
+- **Gate.** The committed baseline metrics are the floor. CI fails if any metric drops by more than a stated tolerance. A failing case can be pinned as a named regression test.
+- **Comparison.** The harness runs vector-only and hybrid on the same cases and writes both to the build log. Each later retrieval change must show its effect here.
+- **The escalation ADR in Step 2.12** records the chosen rule and threshold with the metrics that justify them. Starting rule to test: escalate when `topVectorScore` is below the threshold **and** there is no full-text hit, or when the visitor asks for a person.
+
+Answer-quality judging with an LLM is optional and not part of CI.
+
+### 12.5 Heading-aware chunking and content-hash reuse (Steps 2.4 and 2.5)
+
+- **Chunking.** For markdown, a heading starts a new chunk, and each chunk records its heading path (for example `Refunds > Timelines`). The heading path is prepended to the text that is embedded and full-text indexed, but not to the text shown as evidence. Long sections are still split by the guide's recursive splitter. PDFs and plain text use the recursive splitter alone. Chunking stays deterministic.
+- **Reuse.** Store `content_hash` (SHA-256 of the extracted, normalized text) on `documents`. If a `ready` document **in the same workspace** has the same hash and embedding model, copy its chunks and vectors instead of calling the embedding API, and record that no embedding call was made. Never reuse across workspaces: a cost or timing difference would reveal that another tenant holds the same document.
+
+Tests: markdown headings produce one chunk per section with its path; the same input always produces the same chunks; re-uploading identical content in the same workspace makes no embedding call; the same content in another workspace is embedded separately.
+
+### 12.6 Considered and not adopted (for now)
+
+Each item can return later, but only with evidence from the 12.4 harness that it fixes failing cases:
+
+- **Cross-encoder reranking.** It gave the largest gain after hybrid search in the course study, but it needs either a model server or a hosted reranker. Revisit after Phase 3 if the harness shows good chunks ranking below Top-K.
+- **Grading the context before generating.** A cheap way to make escalation smarter. Revisit if the threshold rule misclassifies cases in the harness.
+- **HyDE, multi-query and query decomposition.** Each adds model calls and latency to every chat message.
+- **Self-correcting answer loops.** Verifying after generation does not fit streamed answers, because the visitor has already seen the text.
+- **GraphRAG, and OCR for scanned PDFs.** Large maintenance cost for support content. Step 2.3 already rejects PDFs without a text layer.
+
+---
+
+## 13. Next step
 
 Start the repository with the monorepo, config, and the database migration with RLS. Write the isolation tests before the features that use them. Then add Cognito sign-in, membership checks, and CI. Do not create every package in the proposed architecture at once; create packages when the phase needs them.
