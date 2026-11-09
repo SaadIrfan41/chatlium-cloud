@@ -287,3 +287,31 @@ Surprises:
 - The first broken start showed the Step 1.2 config error doing its job: every missing variable listed by name, and no values.
 - The shadcn CLI added a package literally called `cn`. It was checked before use: it is shadcn's own (`github.com/shadcn-ui/cn`), a compiled replacement for `clsx` + `tailwind-merge`.
 - The browser pane was hidden during testing, so clicks could not be delivered. Form submission used `requestSubmit()`, which is equivalent to clicking the submit button.
+
+**1.11 Token verification and session loading (2026-11-09).** New package `packages/auth`:
+
+- `createIdTokenVerifier({ issuer, clientId })` → `verifyIdToken(token)`: checks the RS256 signature against the pool's JWKS (`<issuer>/.well-known/jwks.json`, cached by jose), `iss`, `aud` (the client ID), `exp` (5 s tolerance) and `token_use === 'id'`, and requires `sub` and `email`. Failures throw `InvalidIdTokenError` with a loggable reason, never the token.
+- `createSessionStore(...)` → `requireSession(request)`: reads the sealed cookie, unseals it (authenticated, with expiry inside), and returns `{ userId, cognitoSub, email, csrf }`, or throws `UnauthenticatedError`.
+- `refreshIfStale(session, { refresh, verifyIdToken })` implements the decision record's "access tokens 15 minutes, refreshed on the server". While the last ID token is valid it does nothing. After that it redeems the refresh token, re-verifies the new ID token and requires the same `sub`. If Cognito refuses, verification fails or the user changed, the session ends.
+- `packages/db`: `upsertUserByCognitoSub()` creates the application user on first sign-in. Later sign-ins keep the same ID and refresh the email. It runs as `chatlium_app`.
+- Web: the callback verifies with `@chatlium/auth`, creates the user, and stores `userId` and `idTokenExpiresAt` in the session. A new `src/proxy.ts` (Next 16's renamed middleware, on the Node runtime) refreshes stale sessions before the page renders, or removes the cookie if the refresh is refused.
+
+Done-when evidence (the guide's four invalid cases, plus more): 21 tests in `packages/auth`. Rejected: expired, wrong audience, wrong issuer, an access token used as an ID token, a key not in the JWKS, `alg: none`, an HS256 algorithm-confusion token, and no email. Accepted: a valid token. Session: a valid cookie, missing, tampered, foreign secret, and a non-UUID user ID. Refresh: fresh untouched, stale refreshed, refreshed 30 s early, revoked, forged new token, a different user, and no refresh token.
+
+Live, against Floci (`pnpm --filter @chatlium/dev-tools web:auth-check`):
+
+```
+session holds userId 01a1c068-b8dc-7f72-ac49-0434df422f45 (an application UUID)
+stale session  -> HTTP 200, refreshed server-side: true (ID token now valid for 900 s)
+revoked token  -> revoke HTTP 200; dashboard HTTP 307 /, session cleared: true
+```
+
+The browser sign-in created the `users` row (UUIDv7 ID linked to the Cognito `sub`), and `/dashboard` renders for that user.
+
+Mutation checks (each reverted): dropping the audience, issuer or `token_use` checks, skipping the same-user check on refresh, or keeping the session when a refresh fails each fail their test. **Not caught:** removing the RS256 allow-list. jose already refuses `none` and only uses a JWKS key whose type matches the algorithm, so algorithm confusion fails either way. That makes it an equivalent mutant; the pin stays as defense in depth, and an explicit HS256 confusion test was added.
+
+Surprises:
+
+- **Turbopack treats `new URL('../drizzle', import.meta.url)` as a bundled asset** and failed on the migrations folder. The real fix was a design one: `@chatlium/db` now has two entry points, the runtime API (`.`) and `./admin` (role bootstrap and migrations). The web app no longer bundles administrative code.
+- Floci keeps a managed-login session cookie, so a second sign-in skipped the form. That matches AWS behaviour.
+- `seal()` threw synchronously on a schema error. It is now `async`, so callers always get a rejected promise.

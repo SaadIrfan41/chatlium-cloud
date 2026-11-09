@@ -1,7 +1,7 @@
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { APP_ROLE, bootstrapRoles, OWNER_ROLE, readRoleFlags } from '../../src/index.ts';
+import { APP_ROLE, bootstrapRoles, OWNER_ROLE, readRoleFlags } from '../../src/admin.ts';
 import { connect, startPostgres, urlFor } from './postgres.ts';
 
 const OWNER_PASSWORD = 'owner-test-password-0123456789abcdef';

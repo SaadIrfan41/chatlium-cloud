@@ -4,7 +4,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   // Workspace packages export TypeScript source; compile them with the app.
-  transpilePackages: ['@chatlium/config', '@chatlium/crypto', '@chatlium/observability'],
+  transpilePackages: [
+    '@chatlium/auth',
+    '@chatlium/config',
+    '@chatlium/crypto',
+    '@chatlium/db',
+    '@chatlium/observability',
+  ],
   async headers() {
     return [
       {

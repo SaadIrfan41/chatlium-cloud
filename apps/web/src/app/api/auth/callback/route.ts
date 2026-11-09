@@ -1,17 +1,19 @@
 import { randomBytes } from 'node:crypto';
+import { upsertUserByCognitoSub } from '@chatlium/db';
 import * as oidc from 'openid-client';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   cookieOptions,
-  sessionCookieName,
-  sessions,
   SESSION_TTL_SECONDS,
+  sessions,
   transactionCookieName,
   transactions,
   transactionSchema,
 } from '@/server/auth/cookies';
 import { callbackUrl, oidcConfig } from '@/server/auth/oidc';
+import { verifyIdToken } from '@/server/auth/tokens';
 import { config, log } from '@/server/config';
+import { db } from '@/server/db';
 
 function backToSignIn(reason: 'expired' | 'cancelled' | 'failed'): NextResponse {
   const url = new URL('/', config().APP_BASE_URL);
@@ -22,10 +24,11 @@ function backToSignIn(reason: 'expired' | 'cancelled' | 'failed'): NextResponse 
 }
 
 /**
- * Finishes sign-in. Checks state against the sealed transaction, redeems the code on the server
- * with the PKCE verifier and the client secret, and verifies the ID token: openid-client checks
- * the signature, `iss`, `aud`, `exp` and `nonce`; Cognito's `token_use` is checked here.
- * Only then is the sealed session cookie created. No token is ever sent to the browser.
+ * Finishes sign-in. Checks `state` against the sealed transaction and redeems the code on the
+ * server with the PKCE verifier and client secret; openid-client verifies the ID token's
+ * signature, `iss`, `aud`, `exp` and `nonce`. The same token is then verified by @chatlium/auth
+ * (signature, `iss`, `aud`, `exp`, `token_use`), the path every later refresh also takes. The
+ * application user is created on first sign-in, and only then is the sealed session set.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const sealed = request.cookies.get(transactionCookieName())?.value;
@@ -49,26 +52,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       expectedNonce: transaction.nonce,
       idTokenExpected: true,
     });
-    const claims = tokens.claims();
-    if (
-      claims === undefined ||
-      claims['token_use'] !== 'id' ||
-      typeof claims['email'] !== 'string'
-    ) {
-      throw new Error('ID token is missing token_use=id or email');
+    if (tokens.id_token === undefined) {
+      throw new Error('token response has no ID token');
     }
+    const claims = await verifyIdToken(tokens.id_token);
+    const userId = await upsertUserByCognitoSub(db(), {
+      cognitoSub: claims.sub,
+      email: claims.email,
+    });
 
-    const session = await sessions().seal(
-      {
-        sub: claims.sub,
-        email: claims['email'],
-        csrf: randomBytes(32).toString('base64url'),
-        ...(tokens.refresh_token === undefined ? {} : { refreshToken: tokens.refresh_token }),
-      },
-      SESSION_TTL_SECONDS,
-    );
+    const session = await sessions().seal({
+      userId,
+      cognitoSub: claims.sub,
+      email: claims.email,
+      csrf: randomBytes(32).toString('base64url'),
+      idTokenExpiresAt: claims.exp,
+      ...(tokens.refresh_token === undefined ? {} : { refreshToken: tokens.refresh_token }),
+    });
     const response = NextResponse.redirect(new URL('/dashboard', config().APP_BASE_URL), 303);
-    response.cookies.set(sessionCookieName(), session, cookieOptions(SESSION_TTL_SECONDS));
+    response.cookies.set(sessions().cookieName, session, cookieOptions(SESSION_TTL_SECONDS));
     response.cookies.delete(transactionCookieName());
     log().info({ event: 'signin.succeeded' }, 'sign-in completed');
     return response;
