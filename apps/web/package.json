@@ -8,7 +8,7 @@
     "dev": "node scripts/next.ts dev --port 3000",
     "build": "node scripts/next.ts build",
     "start": "node scripts/next.ts start --port 3000",
-    "lint": "oxlint --type-aware --deny-warnings .",
+    "lint": "node scripts/next.ts typegen && oxlint --type-aware --deny-warnings .",
     "typecheck": "node scripts/next.ts typegen && tsc -p .",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

@@ -344,3 +344,31 @@ ok   no session: GET /api/workspaces -> 401
 In the browser, operator.a's dashboard shows only Acme Support (Operator).
 
 Mutation checks (each reverted): ranking with `>` instead of `>=`, skipping the role comparison, skipping the UUID check (a malformed ID then reaches Postgres and errors), looking up the membership without the workspace condition, adding a reason to the 403 body, and dropping `no-store` each fail a test. **Not caught:** removing the explicit `workspace_id` filter from `listDocuments`. Row-level security still returns only the workspace's rows, so this mutant is equivalent while RLS is on. The filter stays as defense in depth, and RLS itself is proven by `test:isolation-proof`.
+
+**1.13 Continuous integration (2026-11-09).**
+
+- `.github/workflows/ci.yml` runs on pull requests and on pushes to `main`. It has two jobs, both required on `main`:
+  - **Lint, typecheck, unit tests, build:** `format:check`, `lint`, `typecheck`, `test` and `build`.
+  - **Integration tests:** `test:integration`, using Testcontainers on the runner's Docker with the same digest-pinned pgvector image as Compose.
+- Node comes from `.nvmrc`. pnpm comes from `packageManager` through `pnpm/action-setup`, because Node 26 does not bundle Corepack. Dependencies install with `--frozen-lockfile`, and the pnpm store is cached by `actions/setup-node`.
+- Hardening:
+  - Every action is pinned to a commit SHA, with the version in a comment. Versions are the latest releases: checkout v7.0.1, setup-node v7.1.0, pnpm/action-setup v6.1.1.
+  - `permissions: contents: read` and `persist-credentials: false`.
+  - The workflow uses no secrets.
+  - A new push cancels the older run of the same PR.
+- Branch protection on `main` now also requires both checks, with `strict` set so the branch must be up to date. The checks are bound to the GitHub Actions app (ID 15368), so a commit status from another source cannot satisfy them. All existing rules are unchanged.
+- `renovate.json`:
+  - Runs weekly, Monday 00:00–05:59 UTC.
+  - Grouped PRs: all non-major npm updates, GitHub Actions (including pinned digests), container images, and oxlint together with oxlint-tsgolint. Each major update gets its own PR.
+  - Weekly lockfile maintenance and `pnpmDedupe`.
+  - `minimumReleaseAge: 3 days`, so Renovate never proposes a version that pnpm 12's release-age delay would reject (the policy is no `minimumReleaseAgeExclude` entries).
+  - A custom regex manager keeps the Testcontainers image in `packages/db/test/integration/postgres.ts` on the same digest as `docker-compose.yml`.
+  - Validated with `renovate-config-validator --strict`.
+
+Surprise: before the first push, the CI steps were run in a fresh clone with no `.env`. Web lint failed. It relied on Next's generated `RouteContext` type, which existed only in the local `.next` folder. The web `lint` script now runs `next typegen` first. Running the steps clean caught this before it could become a red CI run on GitHub.
+
+Done-when evidence, from probe PR #14 (closed, never merged):
+
+1. Added `packages/config/test/ci-probe.test.ts`, which asserts `1 + 1 === 3`. CI showed **Lint, typecheck, unit tests, build: fail** (`AssertionError: expected 2 to be 3`) and **Integration tests: pass**.
+2. With the PR marked ready for review, GitHub reported `mergeable: MERGEABLE` (no conflicts) and `mergeStateStatus: BLOCKED`. The failing required check was the only remaining cause.
+3. Removing the test made both checks pass (unit job 40 s, integration job 53 s), and the PR became `CLEAN`, so it could be merged. It was closed instead.
