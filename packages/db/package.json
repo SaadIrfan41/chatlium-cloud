@@ -12,7 +12,9 @@
     "typecheck": "tsc -p .",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:bootstrap": "node --env-file=../../.env scripts/bootstrap.ts",
-    "db:verify-roles": "node --env-file=../../.env scripts/verify-roles.ts"
+    "db:verify-roles": "node --env-file=../../.env scripts/verify-roles.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=../../.env scripts/migrate.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",

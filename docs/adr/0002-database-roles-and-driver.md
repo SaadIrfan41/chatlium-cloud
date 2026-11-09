@@ -16,6 +16,8 @@ PostgreSQL only lets a role with `CREATEROLE` create other roles. In practice th
    - creates the `vector` extension (needs elevated rights);
    - revokes `CONNECT` and `TEMPORARY` on the database from `PUBLIC` and grants `CONNECT` to the two roles only;
    - makes `chatlium_owner` the owner of schema `public`, and grants `chatlium_app` `USAGE` only;
+   - creates schema `drizzle` (migration history) owned by `chatlium_owner`, with no access for anyone else, so the app cannot read or tamper with migration records;
+   - grants `chatlium_owner` `CREATE` on the database. Drizzle's migrator always runs `CREATE SCHEMA IF NOT EXISTS "drizzle"`, and PostgreSQL checks the privilege before it checks existence. `CREATE` on a database allows creating schemas only, not roles (added in Step 1.6);
    - sets default privileges so that tables and sequences the owner creates later give the app `SELECT, INSERT, UPDATE, DELETE` and `USAGE, SELECT` on sequences, and nothing else (no `TRUNCATE`, `REFERENCES`, `TRIGGER` or DDL).
 2. **Migrations run as `chatlium_owner`.** They create tables, RLS policies and `FORCE ROW LEVEL SECURITY` (Step 1.6).
 3. **Three separate connection URLs**: `DATABASE_ADMIN_URL` (bootstrap only), `DATABASE_OWNER_URL` (migrations only) and `DATABASE_URL` (`chatlium_app`, the only one application processes receive). Admin and owner URLs are read by `packages/db/scripts/env.ts`, never by `@chatlium/config`.
