@@ -103,8 +103,8 @@ try {
     [DEV_WORKSPACES.acme.id, userA, DEV_WORKSPACES.beta.id, userB],
   );
   await client.query(
-    `INSERT INTO documents (id, workspace_id, title, status, s3_key)
-     SELECT id, workspace_id, title, 'ready', 'dev/' || id
+    `INSERT INTO documents (id, workspace_id, title, status, s3_key, content_type, size_bytes)
+     SELECT id, workspace_id, title, 'ready', 'dev/' || id, 'text/plain', 1
        FROM unnest($1::uuid[], $2::uuid[], $3::text[]) AS seed(id, workspace_id, title)
      ON CONFLICT (id) DO NOTHING`,
     [

@@ -111,8 +111,21 @@ describe('migrations', () => {
 
     await runMigrations(ownerUrl);
 
-    expect(before).toBe('3');
+    expect(before).toBe('4');
     expect(await appliedMigrationCount()).toBe(before);
+  });
+
+  it('leave no backfill default on the upload columns, so every insert must state them', async () => {
+    const columns = await admin.query<{ column_name: string; column_default: string | null }>(
+      `SELECT column_name, column_default FROM information_schema.columns
+       WHERE table_name = 'documents' AND column_name IN ('content_type', 'size_bytes')
+       ORDER BY column_name`,
+    );
+
+    expect(columns.rows).toEqual([
+      { column_name: 'content_type', column_default: null },
+      { column_name: 'size_bytes', column_default: null },
+    ]);
   });
 
   it('apply RLS to the table owner too, because of FORCE', async () => {
@@ -121,7 +134,8 @@ describe('migrations', () => {
     );
     const workspaceId = workspace.rows[0]?.id;
     await admin.query(
-      "INSERT INTO documents (workspace_id, title, s3_key) VALUES ($1, 'doc', 'k')",
+      `INSERT INTO documents (workspace_id, title, s3_key, content_type, size_bytes)
+       VALUES ($1, 'doc', 'k', 'text/plain', 1)`,
       [workspaceId],
     );
 

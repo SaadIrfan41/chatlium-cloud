@@ -18,3 +18,11 @@ export {
   type MembershipRole,
   type UserWorkspace,
 } from './workspaces.ts';
+export {
+  createPendingDocument,
+  findDocument,
+  markDocumentUploaded,
+  type DocumentRecord,
+  type DocumentStatus,
+  type UserInWorkspace,
+} from './documents.ts';

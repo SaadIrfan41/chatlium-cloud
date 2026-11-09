@@ -27,3 +27,4 @@ export {
   type WorkspaceMember,
   type WorkspaceRole,
 } from './workspace-role.ts';
+export { CSRF_HEADER, verifyStateChangingRequest } from './csrf.ts';

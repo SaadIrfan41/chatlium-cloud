@@ -7,6 +7,7 @@
  */
 import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   pgEnum,
@@ -72,12 +73,19 @@ export const documents = pgTable(
     title: text('title').notNull(),
     status: documentStatus('status').notNull().default('pending'),
     s3Key: text('s3_key').notNull(),
+    /** As declared by the uploader, then checked against the stored object (Step 2.2). */
+    contentType: text('content_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
     /** Set when indexing finishes. Vectors from different models are not comparable. */
     embeddingModel: text('embedding_model'),
     embeddingDims: integer('embedding_dims'),
     createdAt: createdAt(),
   },
-  (table) => [index('documents_workspace_id_idx').on(table.workspaceId)],
+  (table) => [
+    index('documents_workspace_id_idx').on(table.workspaceId),
+    check('documents_size_bytes_positive', sql`${table.sizeBytes} > 0`),
+    uniqueIndex('documents_s3_key_key').on(table.s3Key),
+  ],
 );
 
 export const conversations = pgTable(

@@ -414,3 +414,37 @@ Mutation checks: 13 deliberate bugs in the adapter, each reverted:
 The first run missed the last one. The obvious test, publishing after `stop()` resolved, passes even with the bug, because a stopped consumer is already removed from the list. The bug only matters _during_ `stop()`, while handlers are still in flight. The contract now includes a test that publishes in that window, and it catches the bug.
 
 Surprise: with dead-lettering removed, a handler that always throws is redelivered in a tight microtask loop. That starves the event loop, so even Vitest's own timeout never fires. The first mutation runner hung for hours, because on Windows `subprocess.run(..., timeout=)` with `shell=True` kills only the shell, not Node. The runner now kills the whole tree (`taskkill /T /F`) and counts a hang as caught. In the real adapter, dead-lettering ends that loop after `maxReceiveCount` deliveries. `retryDelayMs` can also space retries out.
+
+**2.2 Document upload (2026-11-10).** An operator uploads a document straight to S3 through a presigned URL. The API never handles the bytes.
+
+- Flow:
+  1. `POST /api/workspaces/:id/documents` with `{ title, contentType, sizeBytes }` creates a `pending` document and returns a presigned `PUT` (5-minute expiry).
+  2. The browser `PUT`s the file to S3.
+  3. `POST /api/workspaces/:id/documents/:docId/confirm` checks that the object exists with the declared size and type, moves the document `pending` → `uploaded`, and enqueues an indexing job (`jobId` `index:<docId>`) on the in-process queue from 2.1. Nothing consumes it until 2.5.
+- New packages:
+  - `packages/storage`: the `ObjectStorage` interface and its S3 adapter, plus `@chatlium/storage/testing` with a throwaway Floci.
+  - `packages/contracts`: the request schema, the limits, the S3 key layout and the indexing-job schema. The web app, the database package and (from 2.5) the worker share them.
+- Limits:
+  - At most 10 MiB per document. The guide's sources are policy and help documents, and 10 MiB of text is far more than one of those needs. Bigger files would also make the 2.5 worker's extraction and embedding cost unbounded per job.
+  - Allowed types: plain text, Markdown, PDF and JSON.
+  - The create request itself is capped at 2 KiB. The cap is checked against the declared `Content-Length`, and also while reading the stream, which stops at the limit.
+- The S3 key is always `workspaces/<workspaceId>/documents/<documentId>`, derived on the server. The client never supplies it, and a `strictObject` schema refuses an `s3Key` field outright. The key is unique in the database.
+- Content type and exact length are part of the SigV4 signature (`signableHeaders`), so S3 itself refuses a `PUT` with a different type or size. Confirm checks both again, in case an object reaches the key some other way.
+- Writes need the operator role plus the amendments §2 CSRF check: a same-origin `Origin` and the session's synchronizer token in `x-csrf-token`, compared in constant time. A failure is the same plain 403 as any other authorization failure. A document of another workspace, a missing one and a malformed ID all give one identical 404.
+- A second confirm re-sends the same job (same `jobId`), so a lost enqueue can be recovered. The status update only applies to a `pending` document, so two concurrent confirms cannot both win and a `ready` document never moves back.
+- Known gap until 3.3: the status change commits before the publish, so a crash between them leaves an `uploaded` document with no job until someone confirms again. The outbox in Phase 3 closes this.
+- `pnpm --filter @chatlium/dev-tools s3:setup` creates the local bucket. It is idempotent and refuses non-local endpoints. It blocks public access, enables versioning, and sets CORS to allow only a `PUT` with `content-type` from `APP_BASE_URL`.
+
+Done-when evidence: `web:upload-check` passes against the dev server, Floci and the seeded database. It signs in, creates a document, passes the CORS preflight (another origin gets 403), uploads 89 bytes, confirms with 202, and sees the document listed as `uploaded`. A direct Postgres query agrees (`uploaded|text/markdown|89`). Along the way the check also confirms the refusals: confirm before the upload gives 409, a `PUT` with a different type gives 403, and a wrong CSRF token gives 403. Integration tests: 27 web (Postgres and Floci containers), 5 database lifecycle, and 6 storage (tampered size, type and key refused, expired URL refused).
+
+Mutation checks: 25 deliberate bugs, each reverted. 24 are caught. They cover every confirm check, CSRF origin, token and length guard, the role, the pending-only update, enqueue on the wrong status, the key layout, the size limit, and unknown keys. The one survivor is equivalent: dropping the explicit `workspace_id` filter in `findDocument` changes nothing, because RLS already hides other tenants' rows. The filter stays as the decision record's defense in depth.
+
+Two first-run misses taught something:
+
+- **The body limit was only tested once.** The one 413 test was satisfied by either the declared-length check or the stream check, so removing either went unnoticed. There is now one test per check. The stream test uses an endless body, so it only finishes if reading stops at the limit.
+- **A presigning option did nothing.** `unhoistableHeaders: content-type, content-length` was a no-op, because the SDK only hoists `x-amz-*` headers into the query string. I removed it. The mutant that matters, dropping `signableHeaders`, is caught.
+
+Surprises:
+
+- **Floci doesn't verify signatures by default.** Floci 2.4 accepts any presigned URL, tampered or expired, unless `FLOCI_AUTH_VALIDATE_SIGNATURES=true` is set. Without it, every "S3 refuses a changed upload" test would have passed against the bug. It is now set in `docker-compose.yml` and in the test container. Cognito still works with it on.
+- **An UPDATE backfill hit FORCE RLS.** Migration `0003` first backfilled the new `content_type` and `size_bytes` columns with an `UPDATE`. That changed 0 rows, because migrations run as `chatlium_owner` and FORCE RLS hides every row from the owner when no workspace is set. Now each column is added `NOT NULL` with a `DEFAULT`, which DDL applies to every row regardless of RLS, and the default is dropped right after. A migration test checks that no default is left behind. Lesson: data migrations under FORCE RLS need a workspace context or DDL, never a plain owner `UPDATE`.
