@@ -175,3 +175,20 @@ Surprises:
 - **Drizzle's migrator needs `CREATE` on the database** even when its schema already exists, because PostgreSQL checks the privilege before existence. The bootstrap now creates the `drizzle` schema (owned by the owner, closed to everyone else) and grants the owner `CREATE` on the database. ADR 0002 is updated.
 - **`nullif` matters only on reused connections.** In a fresh session an unset setting is NULL and returns no rows anyway. After a transaction-local `set_config`, the session reads `''`, and without `nullif` the query raises `invalid input syntax for type uuid` instead of failing closed. The new test pins this behavior down.
 - Drizzle cannot express `FORCE ROW LEVEL SECURITY`, so RLS lives in a custom migration. drizzle-kit ignores policies it does not manage, so later `generate` runs leave them alone (`generate` reports no changes).
+
+**1.7 Tenant context helpers (2026-11-09).** `packages/db/src/tenant.ts`:
+
+- `withWorkspace(db, workspaceId, fn)` and `withUser(db, userId, fn)` run `fn` in a transaction after `SELECT set_config('app.workspace_id' | 'app.user_id', $1, true)`. The value is a bind parameter, never string interpolation (`SET LOCAL` cannot take parameters), and the setting is transaction-local.
+- IDs are validated as UUIDs first. A non-UUID throws `InvalidTenantIdError` before any SQL runs.
+- A shared test fixture, `startMigratedDatabase()`, starts a container, bootstraps roles and runs migrations. Step 1.8 reuses it.
+
+Done-when evidence: with a pool of **one** connection, the backend PID is the same before and after `withWorkspace(A)`, and the next transaction reads `app.workspace_id` as unset. 8 tests pass (24 in the package). They cover: the context is set inside only; no leak on the same connection; no leak and rollback when the callback throws; RLS scopes reads to the workspace; two concurrent transactions on two connections each see only their own workspace (overlapped with `pg_sleep`); a SQL-injection string is rejected with no SQL run and no data lost; `withUser` sets only `app.user_id` and clears it afterwards.
+
+Mutation checks (each reverted):
+
+- `set_config(..., false)` (session-level) → 3 tests fail. The workspace leaks into the next transaction, and even into a later `withUser` call
+- Skip UUID validation → injection test fails
+- Never set the workspace → 4 tests fail
+- `withUser` sets the wrong setting → 1 test fails
+
+Not caught by behavior: rewriting `set_config` as `SET LOCAL` with string interpolation passes, because UUID validation already blocks injection. The code-level rule (bind parameters only) is enforced by review and stated in the function's doc comment.
