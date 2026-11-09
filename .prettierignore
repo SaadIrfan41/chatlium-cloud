@@ -9,3 +9,4 @@ coverage/
 skills-lock.json
 docs/decisions/
 docs/build-guide.md
+next-env.d.ts

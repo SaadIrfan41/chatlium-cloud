@@ -46,6 +46,8 @@ export const envSchema = z.object({
       error: 'must be a user pool ID such as us-east-1_AbC123',
     }),
   COGNITO_CLIENT_ID: z.string({ error: 'is required' }).min(1, { error: 'must not be empty' }),
+  /** App client secret. Server-side only: sent to the token endpoint, never to a browser (ADR 0004). */
+  COGNITO_CLIENT_SECRET: z.string({ error: 'is required' }).min(1, { error: 'must not be empty' }),
   /** Expected `iss` claim. Explicit because Floci and AWS issue different issuer hosts. */
   COGNITO_ISSUER: url(['http', 'https']),
 

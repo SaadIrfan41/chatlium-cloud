@@ -8,7 +8,8 @@
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc -p .",
     "cognito:setup": "node --env-file=../../.env src/cognito-setup.ts",
-    "cognito:check": "node --env-file=../../.env src/cognito-signin-check.ts"
+    "cognito:check": "node --env-file=../../.env src/cognito-signin-check.ts",
+    "web:auth-check": "node --env-file=../../.env src/web-auth-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "3.1164.0"

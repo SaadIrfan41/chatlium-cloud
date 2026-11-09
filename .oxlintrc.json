@@ -22,7 +22,13 @@
     "typescript/only-throw-error": "error",
     "eqeqeq": "error",
     "no-console": "error",
-    "import/no-cycle": "error"
+    "import/no-cycle": "error",
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": ["server-only", "**/*.css"]
+      }
+    ]
   },
   "ignorePatterns": [
     "**/dist/**",

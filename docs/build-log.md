@@ -250,3 +250,40 @@ Surprises:
 
 - Floci's issuer is `http://localhost:4566/<poolId>` (AWS: `https://cognito-idp.<region>.amazonaws.com/<poolId>`), which is why `COGNITO_ISSUER` is explicit configuration (Step 1.2). It stays consistent in Phase 1 only because the browser and the dev server both use `localhost`. Phase 3 (web app in a container) must handle the browser seeing `localhost` while the server sees `floci`.
 - The AWS SDK resolved to `3.1164.0`, published 2.6 days earlier, so it passes pnpm's release-age delay with no exception.
+
+**1.10 Web application skeleton and sign-in (2026-11-09).**
+
+- `apps/web`: Next.js 16.4.5 (App Router, Turbopack), React 19.3, Tailwind 4.3, shadcn/ui 4.23 (Base UI, `base-nova`), TypeScript 7. **Next 16.4 supports TypeScript 7**: `next build` runs the project's own `tsc` CLI (documented in its bundled docs), so no workaround is needed.
+- `packages/crypto`: `createSealer(secret, purpose)` seals cookies as compact JWE (`dir` + `A256GCM`) with a per-purpose key derived by HKDF, and expiry inside the ciphertext. 9 tests: round trip, encryption hides the payload, tamper, wrong key, wrong purpose, expiry at 59 s and 61 s, schema mismatch, garbage input, short secret.
+- Routes:
+  - `GET /api/auth/login` creates a fresh PKCE verifier, `state` and `nonce`, seals them into a 10-minute cookie, and redirects to Cognito.
+  - `GET /api/auth/callback` checks the sealed transaction and `state`, redeems the code server-side (PKCE plus client secret), and verifies the ID token (openid-client checks signature, `iss`, `aud`, `exp` and `nonce`; `token_use=id` is checked explicitly). It then sets the sealed session cookie.
+  - `POST /api/auth/logout` requires a trusted `Origin` **and** the session's CSRF token, revokes the refresh token, clears the cookie, and redirects to Cognito's sign-out.
+  - The callback URL is built from `APP_BASE_URL`, never from the request's `Host` header.
+- UI per [ADR 0005](adr/0005-ui-stack-and-design.md): a sign-in page whose hero is a sample conversation (teal grounded answer, amber hand-off), and a signed-in home with an account menu (email, Light / Dark / Match my device, Sign out). WCAG 2.2 AA contrast is computed for 22 pairs, plus a skip link, landmarks and reduced motion.
+- `@chatlium/config` gains `COGNITO_CLIENT_SECRET`. `apps/web/scripts/next.ts` loads the repository-root `.env`, then runs the Next CLI in-process.
+
+Done-when evidence, in the built-in browser with test user A:
+
+- Sign in: `/` → Floci hosted form (URL carries `code_challenge_method=S256`, `state` and `nonce`) → `/api/auth/callback` → `/dashboard` ("You're signed in").
+- In the page: `document.cookie` is `""`, so the session cookie is HttpOnly. `localStorage` and `sessionStorage` have **no keys**, and no JWT appears in the HTML.
+- Sign out (the account menu's form): back to `/`, and `/dashboard` then redirects to `/`.
+- `pnpm --filter @chatlium/dev-tools web:auth-check` (repeatable):
+  ```
+  login     Set-Cookie chatlium_signin=<401 chars>; Path=/; Max-Age=600; HttpOnly; SameSite=lax
+  callback  Set-Cookie chatlium_session=<777 chars>; Path=/; Max-Age=604800; HttpOnly; SameSite=lax
+  callback  -> HTTP 303 /dashboard
+  sign-out without Origin        -> HTTP 403
+  sign-out with wrong CSRF token -> HTTP 403
+  sign-out                       -> HTTP 303 /cognito-idp/logout   (session cookie cleared)
+  dashboard after sign-out       -> HTTP 307 /
+  ```
+  `Secure` and the `__Host-` prefix are applied automatically when `APP_BASE_URL` is https. They are absent only on `http://localhost`.
+- At phone width (375 px) there is no horizontal overflow, the light theme applies, and the headline uses its 75% width.
+
+Surprises:
+
+- **Next.js reads `.env` only from the app folder.** `@next/env`'s `loadEnvConfig` caches its first result, so calling it from `next.config.ts` did nothing. Node's `--env-file` cannot be forwarded to Next's workers, because `NODE_OPTIONS` rejects it. Fix: a tiny launcher (`scripts/next.ts`) uses Node's built-in `process.loadEnvFile()` and then runs the Next CLI in the same process. On Windows, dynamic `import()` needs a `file://` URL, not a path.
+- The first broken start showed the Step 1.2 config error doing its job: every missing variable listed by name, and no values.
+- The shadcn CLI added a package literally called `cn`. It was checked before use: it is shadcn's own (`github.com/shadcn-ui/cn`), a compiled replacement for `clsx` + `tailwind-merge`.
+- The browser pane was hidden during testing, so clicks could not be delivered. Form submission used `requestSubmit()`, which is equivalent to clicking the submit button.
