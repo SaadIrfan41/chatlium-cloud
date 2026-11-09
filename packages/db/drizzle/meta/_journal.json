@@ -29,6 +29,13 @@
       "when": 1794251683252,
       "tag": "0003_document_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794257649878,
+      "tag": "0004_document_failure_reason",
+      "breakpoints": true
     }
   ]
 }

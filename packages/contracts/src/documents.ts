@@ -39,6 +39,34 @@ export const createDocumentRequestSchema = z.strictObject({
 });
 export type CreateDocumentRequest = z.infer<typeof createDocumentRequestSchema>;
 
+/**
+ * Why a document could not be indexed (build guide 2.3). Stored on the document and shown to
+ * operators, so it is always one of these codes, never an error message or document content.
+ */
+export const DOCUMENT_FAILURE_REASONS = [
+  /** The bytes are not what the declared content type says (for example a "PDF" without %PDF). */
+  'type_mismatch',
+  /** A text document that is not valid UTF-8. */
+  'invalid_utf8',
+  /** A JSON document that does not parse. */
+  'invalid_json',
+  /** No text left after extraction and clean-up. */
+  'empty_document',
+  /** A PDF whose pages have no text layer (for example a scan). OCR is not supported. */
+  'no_text_layer',
+  /** A password-protected PDF. */
+  'encrypted_pdf',
+  /** A PDF that the parser cannot read. */
+  'unreadable_pdf',
+  /** A PDF with more pages than the extractor accepts. */
+  'too_many_pages',
+  /** A stored object larger than the upload limit. */
+  'too_large',
+  /** The uploaded object is no longer in storage. */
+  'object_missing',
+] as const;
+export type DocumentFailureReason = (typeof DOCUMENT_FAILURE_REASONS)[number];
+
 /** The S3 key for a document. Never derived from anything the uploader names. */
 export function documentObjectKey(workspaceId: string, documentId: string): string {
   return `workspaces/${workspaceId}/documents/${documentId}`;

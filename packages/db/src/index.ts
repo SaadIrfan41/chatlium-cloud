@@ -21,8 +21,11 @@ export {
 export {
   createPendingDocument,
   findDocument,
+  findDocumentForJob,
+  markDocumentFailed,
   markDocumentUploaded,
   type DocumentRecord,
+  type JobWorkspace,
   type DocumentStatus,
   type UserInWorkspace,
 } from './documents.ts';

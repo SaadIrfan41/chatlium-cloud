@@ -448,3 +448,39 @@ Surprises:
 
 - **Floci doesn't verify signatures by default.** Floci 2.4 accepts any presigned URL, tampered or expired, unless `FLOCI_AUTH_VALIDATE_SIGNATURES=true` is set. Without it, every "S3 refuses a changed upload" test would have passed against the bug. It is now set in `docker-compose.yml` and in the test container. Cognito still works with it on.
 - **An UPDATE backfill hit FORCE RLS.** Migration `0003` first backfilled the new `content_type` and `size_bytes` columns with an `UPDATE`. That changed 0 rows, because migrations run as `chatlium_owner` and FORCE RLS hides every row from the owner when no workspace is set. Now each column is added `NOT NULL` with a `DEFAULT`, which DDL applies to every row regardless of RLS, and the default is dropped right after. A migration test checks that no default is left behind. Lesson: data migrations under FORCE RLS need a workspace context or DDL, never a plain owner `UPDATE`.
+
+**2.3 Text extraction (2026-11-10).** New package `packages/knowledge`. `extractText(bytes, declaredType)` turns a stored document into plain text, or into a failure code. `extractUploadedDocument` is the indexing worker's first stage: it reads an `uploaded` document's object and, when extraction fails, marks the document `failed` with that code. The worker itself arrives in 2.5.
+
+- Text, Markdown and JSON:
+  - Decoded as UTF-8 with `fatal: true`, so invalid bytes are rejected, not replaced.
+  - Null bytes and a byte-order mark are stripped, and line endings become `\n`.
+  - JSON must also parse.
+- The declared type is checked against the bytes. A PDF must start with `%PDF-`, and a text type must not, so neither can be passed off as the other.
+- PDF: only the text layer is read, page by page, with a blank line between pages. The page start offsets are kept for citations later.
+  - Fails with `no_text_layer` when the pages average fewer than 10 visible characters. A scan often still carries a page number, so "zero characters" would be too strict.
+  - At most 500 pages. Password-protected files give `encrypted_pdf`; anything pdf.js can't parse gives `unreadable_pdf`.
+- Failure codes live in `@chatlium/contracts` (`DOCUMENT_FAILURE_REASONS`, 10 codes). They are stored in the new `documents.failure_reason` column (migration `0004`), never as an error message or document content. A check constraint allows only those codes, and only on a `failed` document. The list is copied into the constraint, so adding a code needs a migration.
+- `markDocumentFailed` acts for the workspace without a user (ADR 0003), and only moves `uploaded` → `failed`. A redelivered job can't overwrite an earlier outcome, and reports `skipped`.
+- The stored object's size is checked with a `HEAD` before downloading, so an oversized object is never read into memory.
+
+Library choice, verified 2026-11-10: **`pdfjs-dist` 6.5.438** (Mozilla's pdf.js, released 2026-11-01).
+
+- `pdf-parse` was rejected: its last release was in 2025, and it pins pdf.js 5.4 plus a native canvas.
+- `unpdf` was rejected: it bundles an older pdf.js (6.4).
+- pdf.js 6 no longer has `isEvalSupported` (the CVE-2024-4367 setting). Font loading, system fonts, XFA and the offscreen canvas are all turned off.
+- Its optional native `@napi-rs/canvas` is only used for rendering. `ignoredOptionalDependencies` keeps it out of the install.
+
+Done-when evidence:
+
+- The guide's five tests pass, as part of 20 unit tests: text, Markdown, a PDF with a text layer, a PDF without one (`no_text_layer`), and text declared as a PDF (`type_mismatch`).
+- Test PDFs are built in memory by a small generator, with no binary fixtures. That includes a password-protected one (a Standard security handler whose check values match no password).
+- 14 integration tests against real Postgres (as `chatlium_app`, RLS on) and Floci show that each failure sets `status = failed` with its reason: type mismatch both ways, no text layer, invalid UTF-8, invalid JSON, unsupported stored type, missing object, and too large without a download.
+- 6 new database tests cover the worker helpers and the constraint.
+
+Mutation checks: 28 deliberate bugs, each reverted. The first run caught 25. The three misses were real gaps in the tests:
+
+- **Text-layer threshold on the document total instead of per page.** Every scan test had too little text in total to tell the two apart. A new test has three pages with a 5-character footer each: 15 characters in total, but 5 a page.
+- **Line breaks dropped inside a page.** The PDF test used `toContain` per line, which a run-on page also satisfies. It now asserts the exact page text.
+- **A lost race reported as `failed`.** Nothing tested another delivery winning between the read and the update. A new test makes the storage stub fail the document mid-check, and expects `skipped` with the first reason kept.
+
+After those tests, all 28 are caught.
