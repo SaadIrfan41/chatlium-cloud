@@ -10,3 +10,4 @@ export {
   type BootstrapOptions,
   type RoleFlags,
 } from './roles.ts';
+export { InvalidTenantIdError, withUser, withWorkspace, type TenantTransaction } from './tenant.ts';
